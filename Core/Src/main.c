@@ -184,11 +184,14 @@ void SystemClock_Config(void)
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	if(!rxComplete){
-		if (rxBufferIndex > RX_BUFFER_SIZE - 1) {
-			// Buffer overflow handling
-			rxBufferIndex = 0;
+		if (rxBufferIndex <= RX_BUFFER_SIZE - 1) {
+			rxBuffer[rxBufferIndex++] = rxData;
 		}
-		rxBuffer[rxBufferIndex++] = rxData;
+		else{
+
+			// Buffer overflow handling
+			//			rxBufferIndex = 0;
+		}
 		HAL_UART_Receive_IT(&huart2, &rxData, 1); // Start next reception
 		//	HAL_UART_Transmit(&huart2, &rxData, 1, HAL_MAX_DELAY);
 		if (rxData == 0x0D) { // Example: End of line delimiter
@@ -247,8 +250,8 @@ void CANTaskFunction(void *pvParameters) {
 	while(1){
 		if(rxComplete){
 			rxCurrentMaxIndex = rxBufferIndex;
-			while(rxCurrentMaxIndex - rxBufferIndex < rxCurrentMaxIndex){
-				if((rxCurrentMaxIndex - rxBufferIndex) % 8 != 0 || rxBufferIndex < 8){
+			while(rxBufferIndex > 0){
+				if(rxBufferIndex < 8){
 					for(int8_t i = rxBufferIndex; i < 8; i++){
 						rxBuffer[rxCurrentMaxIndex - rxBufferIndex + i] = 0;
 					}
