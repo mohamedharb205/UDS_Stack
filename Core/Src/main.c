@@ -399,8 +399,6 @@ Std_ReturnType CanTp_Transmit(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 			}
 			else{
 				frame_type = None;
-				startOffset = currentOffset;
-				ConsecSN = 0;
 				//wait for flow control to reach CanTp_RxIndication in order to change numberOfConsecutiveFramesToSend variable
 			}
 			break;
@@ -537,7 +535,6 @@ void CanTp_encodeFirstFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 
 	/** Call CanIF_Transmit Function**/
 	numberOfRemainingBytesToSend = (PduInfoPtr->Length - 6);
-	ConsecSN = 1;
 	startOffset = 0;
 	CanIf_Transmit(TxPduId, &EncodedPduInfo);
 }
@@ -583,7 +580,7 @@ void CanTp_encodeFlowControlFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 
 	// Set the length of the flow control frame
 	//    EncodedPduInfo.Length = 3;
-	ConsecSN = ConsecSN != 1 ? 0 : 1;
+	ConsecSN = 1;
 	// Use CanIf_Transmit to send the flow control frame
 	CanIf_Transmit(TxPduId, &EncodedPduInfo);
 }
@@ -617,7 +614,6 @@ void CanTp_decodeFirstFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	{
 		DecodedPduInfo.Data[Counter]=PduInfoPtr->Data[Counter+2];
 	}
-	ConsecSN = 1;
 	CanTp_ConnectData(&DecodedPduInfo);
 }
 void CanTp_decodeConsecutiveFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
@@ -636,7 +632,7 @@ void CanTp_decodeFlowControlFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	// Extract the Flow Status, Block Size, and Separation Time from the PDU
 	uint8_t flowStatus = PduInfoPtr->Data[0];
 	uint8_t blockSize = PduInfoPtr->Data[1];
-//	uint8_t separationTime = PduInfoPtr->Data[2];
+	//	uint8_t separationTime = PduInfoPtr->Data[2];
 
 	// Update the number of consecutive frames to send based on the Block Size
 	//	if (blockSize == 0) {
@@ -651,6 +647,8 @@ void CanTp_decodeFlowControlFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	case 0x30:  // Continue to send (CTS)
 		// Update expected frame state to send consecutive frames
 		expectedFrameState = Consecutive_Frame_State;
+		startOffset = currentOffset;
+		ConsecSN = 1;
 		break;
 
 	case 0x31:  // Wait (WT)
