@@ -115,8 +115,8 @@ PduInfoType CompletePduInfo;
 
 volatile uint8_t ConsecSN;
 volatile uint16_t currentIndex;
-volatile uint32_t currentOffset;
-volatile uint16_t startOffset;
+volatile int32_t currentOffset = -1;
+volatile int32_t startOffset;
 
 /* USER CODE END PV */
 
@@ -414,7 +414,7 @@ Std_ReturnType CanTp_Transmit(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 
 	//Reset the expected frame
 	expectedFrameState = Any_State;
-
+	currentOffset = -1;
 	return E_OK;
 }
 
@@ -535,21 +535,15 @@ void CanTp_encodeFirstFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 
 	/** Call CanIF_Transmit Function**/
 	numberOfRemainingBytesToSend = (PduInfoPtr->Length - 6);
-	startOffset = 0;
 	CanIf_Transmit(TxPduId, &EncodedPduInfo);
 }
 void CanTp_encodeConsecutiveFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
-
 	uint8_t i = 0;
 	EncodedPduInfo.Length = numberOfRemainingBytesToSend > 7 ? 7 : numberOfRemainingBytesToSend;
 	EncodedPduInfo.Data[0]=(0x02 << 4) | ConsecSN;
 
-	if(startOffset == 0){
-		currentOffset = ConsecSN * 7 -1;
-	}
-	else{
-		currentOffset = startOffset + ConsecSN * 7;
-	}
+	currentOffset = startOffset + ConsecSN * 7;
+
 	for(i=0 ; i < EncodedPduInfo.Length ; i++)
 	{
 		EncodedPduInfo.Data[i+1] = PduInfoPtr->Data[i + currentOffset];
