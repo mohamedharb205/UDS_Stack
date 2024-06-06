@@ -29,23 +29,23 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY
  12 .comment      00000043  00000000  00000000  00020090  2**0
                   CONTENTS, READONLY
- 13 .debug_info   00016eaa  00000000  00000000  000200d3  2**0
+ 13 .debug_info   00016ebd  00000000  00000000  000200d3  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 14 .debug_abbrev 000036d8  00000000  00000000  00036f7d  2**0
+ 14 .debug_abbrev 000036e3  00000000  00000000  00036f90  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 15 .debug_aranges 00001398  00000000  00000000  0003a658  2**3
+ 15 .debug_aranges 00001398  00000000  00000000  0003a678  2**3
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 16 .debug_rnglists 00000f2e  00000000  00000000  0003b9f0  2**0
+ 16 .debug_rnglists 00000f2f  00000000  00000000  0003ba10  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 17 .debug_macro  00024090  00000000  00000000  0003c91e  2**0
+ 17 .debug_macro  00024090  00000000  00000000  0003c93f  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_line   00017ac1  00000000  00000000  000609ae  2**0
+ 18 .debug_line   00017bb4  00000000  00000000  000609cf  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .debug_str    000dbaac  00000000  00000000  0007846f  2**0
+ 19 .debug_str    000dbaa0  00000000  00000000  00078583  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 20 .debug_frame  000052a0  00000000  00000000  00153f1c  2**2
+ 20 .debug_frame  00005298  00000000  00000000  00154024  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .debug_line_str 00000061  00000000  00000000  001591bc  2**0
+ 21 .debug_line_str 00000061  00000000  00000000  001592bc  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -822,7 +822,7 @@ int main(void)
  80007a2:	2102      	movs	r1, #2
  80007a4:	480a      	ldr	r0, [pc, #40]	; (80007d0 <main+0x48>)
  80007a6:	f000 ff8b 	bl	80016c0 <HAL_CAN_ActivateNotification>
-	HAL_UART_Receive_IT(&huart2,&rxData, 1);
+	HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxData, 1);
  80007aa:	2201      	movs	r2, #1
  80007ac:	4909      	ldr	r1, [pc, #36]	; (80007d4 <main+0x4c>)
  80007ae:	480a      	ldr	r0, [pc, #40]	; (80007d8 <main+0x50>)
@@ -838,8 +838,8 @@ int main(void)
  80007c0:	4907      	ldr	r1, [pc, #28]	; (80007e0 <main+0x58>)
  80007c2:	4808      	ldr	r0, [pc, #32]	; (80007e4 <main+0x5c>)
  80007c4:	f003 ffbd 	bl	8004742 <xTaskCreate>
-//	PduInfoType PduInfoPtr ={.Data={0x10,0x09,0x01,0x02,0x03,0x04,0x05,0x06},.Length=0};
-//	CanTp_RxIndication(0, &PduInfoPtr);
+	//	PduInfoType PduInfoPtr ={.Data={0x10,0x09,0x01,0x02,0x03,0x04,0x05,0x06},.Length=0};
+	//	CanTp_RxIndication(0, &PduInfoPtr);
 	/* USER CODE END 2 */
 
 	/* Call init function for freertos objects (in freertos.c) */
@@ -1036,7 +1036,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 			// Buffer overflow handling
 			//			rxBufferIndex = 0;
 		}
-		HAL_UART_Receive_IT(&huart2, &rxData, 1); // Start next reception
+		HAL_UART_Receive_IT(&huart2, (uint8_t*) &rxData, 1); // Start next reception
  80008f2:	2201      	movs	r2, #1
  80008f4:	4909      	ldr	r1, [pc, #36]	; (800091c <HAL_UART_RxCpltCallback+0x58>)
  80008f6:	480b      	ldr	r0, [pc, #44]	; (8000924 <HAL_UART_RxCpltCallback+0x60>)

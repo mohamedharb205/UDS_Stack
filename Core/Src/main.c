@@ -101,18 +101,19 @@ typedef enum
 
 Frame_States expectedFrameState = Any_State;
 
-uint32_t numberOfConsecutiveFramesToSend = 0;
-uint32_t numberOfConsecutiveFramesToReceive = 0;
-uint32_t numberOfRemainingBytesToSend = 0;
-uint32_t numberOfRemainingBytesToReceive = 0;
-uint32_t availableBuffers = 10;
+volatile uint32_t numberOfConsecutiveFramesToSend = 0;
+volatile uint32_t numberOfConsecutiveFramesToReceive = 0;
+volatile uint32_t numberOfRemainingBytesToSend = 0;
+volatile uint32_t numberOfRemainingBytesToReceive = 0;
+volatile uint32_t availableBuffers = 10;
 void (*App_Callback)(uint32_t RxPduId, PduInfoType* PduInfoPtr) = NULL;
 
 PduInfoTRx EncodedPduInfo;
 PduInfoTRx DecodedPduInfo;
 PduInfoType CompletePduInfo;
 
-uint8_t ConsecSN;
+volatile uint8_t ConsecSN;
+volatile uint16_t currentIndex;
 
 /* USER CODE END PV */
 
@@ -139,7 +140,7 @@ void CanTp_decodeFlowControlFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr);
 void CanTp_ConnectData(PduInfoTRx* PduInfoPtr);
 void CanIf_Transmit(uint32_t RxPduId, PduInfoTRx* PduInfoPtr);
 //use this setcallback in the init so that the canIf calls our  CanTp_RxIndication
-void CanIf_setCallback(void (*IF_Callback)(uint32_t RxPduId, PduInfoTRx* PduInfoPtr));
+void CanIf_setCallback(Std_ReturnType (*IF_Callback)(uint32_t RxPduId, PduInfoTRx* PduInfoPtr));
 
 
 /* USER CODE END PFP */
@@ -183,11 +184,11 @@ int main(void)
 	MX_USART2_UART_Init();
 	/* USER CODE BEGIN 2 */
 	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
-	HAL_UART_Receive_IT(&huart2,&rxData, 1);
+	HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxData, 1);
 
 	xTaskCreate(CANTaskFunction, "CAN_TX", configMINIMAL_STACK_SIZE,NULL, 2, &xTaskHandle1) ;
-//	PduInfoType PduInfoPtr ={.Data={0x10,0x09,0x01,0x02,0x03,0x04,0x05,0x06},.Length=0};
-//	CanTp_RxIndication(0, &PduInfoPtr);
+	//	PduInfoType PduInfoPtr ={.Data={0x10,0x09,0x01,0x02,0x03,0x04,0x05,0x06},.Length=0};
+	//	CanTp_RxIndication(0, &PduInfoPtr);
 	/* USER CODE END 2 */
 
 	/* Call init function for freertos objects (in freertos.c) */
@@ -268,7 +269,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 			// Buffer overflow handling
 			//			rxBufferIndex = 0;
 		}
-		HAL_UART_Receive_IT(&huart2, &rxData, 1); // Start next reception
+		HAL_UART_Receive_IT(&huart2, (uint8_t*) &rxData, 1); // Start next reception
 		//	HAL_UART_Transmit(&huart2, &rxData, 1, HAL_MAX_DELAY);
 		if (rxData == 0x0D) { // Example: End of line delimiter
 			rxComplete = 1;
@@ -344,8 +345,7 @@ void CANTaskFunction(void *pvParameters) {
 }
 
 void CanTp_Init(){
-
-
+	CanIf_setCallback(CanTp_RxIndication);
 }
 
 Std_ReturnType CanTp_Transmit(uint32_t TxPduId, PduInfoType* PduInfoPtr){
@@ -356,6 +356,7 @@ Std_ReturnType CanTp_Transmit(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 
 	Frame_Type frame_type;
 	numberOfRemainingBytesToSend = PduInfoPtr->Length;
+	CompletePduInfo.Length = numberOfRemainingBytesToSend;
 	if(expectedFrameState == Any_State){
 		if(PduInfoPtr->Length < 8){
 			frame_type = Single_Frame;
@@ -451,6 +452,7 @@ Std_ReturnType CanTp_RxIndication (uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	}
 	if(numberOfRemainingBytesToReceive == 0){
 		if(App_Callback != NULL){
+			currentIndex = 0;
 			App_Callback(RxPduId, &CompletePduInfo);
 		}
 	}
@@ -459,12 +461,19 @@ Std_ReturnType CanTp_RxIndication (uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 
 Frame_Type CanTp_GetFrameType(uint8_t PCI){
 	//Switch case on the PCI to determine the frame type
-
-	return 0;
+	PCI >>= 4;
+	if(PCI < 4){
+		return (Frame_Type) PCI;
+	}
+	else{
+		return None;
+	}
 }
 
 void CanTp_setCallback(void (*PTF)(uint32_t TxPduId, PduInfoType* PduInfoPtr)){
-
+	if(PTF != NULL){
+		App_Callback = PTF;
+	}
 }
 
 
@@ -472,7 +481,7 @@ void CanIf_Transmit(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 
 }
 
-void CanIf_setCallback(void (*IF_Callback)(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)){
+void CanIf_setCallback(Std_ReturnType (*IF_Callback)(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)){
 
 }
 
@@ -521,30 +530,21 @@ void CanTp_encodeFirstFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 	}
 
 	/** Call CanIF_Transmit Function**/
-	numberOfRemainingBytesToSend= (PduInfoPtr->Length - 6);
+	numberOfRemainingBytesToSend = (PduInfoPtr->Length - 6);
+	ConsecSN = 1;
 	CanIf_Transmit(TxPduId, &EncodedPduInfo);
 }
 void CanTp_encodeConsecutiveFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 
 	uint8_t i = 0;
-	EncodedPduInfo.Data[0]=(0x02 << 4) | (ConsecSN+1);
-	if(ConsecSN == 0)
+	EncodedPduInfo.Length = numberOfRemainingBytesToSend > 7 ? 7 : numberOfRemainingBytesToSend;
+	EncodedPduInfo.Data[0]=(0x02 << 4) | ConsecSN;
+	for(i=0 ; i < EncodedPduInfo.Length ; i++)
 	{
-
-		for(i=1 ; i < 8 ; i++)
-		{
-			EncodedPduInfo.Data[i] = PduInfoPtr->Data[((ConsecSN+1)*8)+(i-2)];
-		}
+		EncodedPduInfo.Data[i+1] = PduInfoPtr->Data[i + ConsecSN * 7];
 	}
-	else
-	{
-		for(i=1 ; i < 8 ; i++)
-		{
-			EncodedPduInfo.Data[i] = PduInfoPtr->Data[((ConsecSN+1)*8)+(i-1)];
-		}
-	}
-
-
+	ConsecSN = ConsecSN + 1 > 0xF ? 0 : ConsecSN + 1;
+	numberOfRemainingBytesToSend -= EncodedPduInfo.Length;
 	CanIf_Transmit(TxPduId, &EncodedPduInfo);
 }
 void CanTp_encodeFlowControlFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
@@ -590,7 +590,7 @@ void CanTp_decodeSingleFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	CanTp_ConnectData(&DecodedPduInfo);
 }
 void CanTp_decodeFirstFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
-	uint32_t payloadLength = ((PduInfoPtr->Data[0] & 0x0F) << 8) | PduInfoPtr->Data[1];
+	numberOfRemainingBytesToReceive = ((PduInfoPtr->Data[0] & 0x0F) << 8) | PduInfoPtr->Data[1];
 	DecodedPduInfo.Length=6;
 	uint8_t Counter=0;
 
@@ -598,21 +598,31 @@ void CanTp_decodeFirstFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	{
 		DecodedPduInfo.Data[Counter]=PduInfoPtr->Data[Counter+2];
 	}
+	ConsecSN = 1;
 	CanTp_ConnectData(&DecodedPduInfo);
 }
 void CanTp_decodeConsecutiveFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
-
+	uint8_t i = 0;
+	DecodedPduInfo.Length = numberOfRemainingBytesToReceive > 7 ? 7 : numberOfRemainingBytesToReceive;
+	if(ConsecSN == (PduInfoPtr->Data[0] & 0x0F)){
+		for(i=0 ; i < DecodedPduInfo.Length ; i++)
+		{
+			DecodedPduInfo.Data[i] = PduInfoPtr->Data[i+1];
+		}
+		ConsecSN = ConsecSN + 1 > 0xF ? 0 : ConsecSN + 1;
+		CanTp_ConnectData(&DecodedPduInfo);
+	}
 }
 void CanTp_decodeFlowControlFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	// Extract the Flow Status, Block Size, and Separation Time from the PDU
 	uint8_t flowStatus = PduInfoPtr->Data[0];
 	uint8_t blockSize = PduInfoPtr->Data[1];
-	uint8_t separationTime = PduInfoPtr->Data[2];
+//	uint8_t separationTime = PduInfoPtr->Data[2];
 
 	// Update the number of consecutive frames to send based on the Block Size
 	//	if (blockSize == 0) {
 	// Continuous sending without waiting for further flow control
-	numberOfConsecutiveFramesToSend = availableBuffers;
+	numberOfConsecutiveFramesToSend = blockSize;
 	//	} else {
 	//		numberOfConsecutiveFramesToSend = blockSize;
 	//	}
@@ -645,7 +655,12 @@ void CanTp_decodeFlowControlFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 
 void CanTp_ConnectData(PduInfoTRx* PduInfoPtr){
 	//use CompletePduInfo struct to connect the data received from PduInfoTRx
-
+	uint16_t tempCurrentIndex = currentIndex;
+	while(currentIndex < PduInfoPtr->Length + tempCurrentIndex){
+		CompletePduInfo.Data[currentIndex] = PduInfoPtr->Data[currentIndex - tempCurrentIndex];
+		currentIndex++;
+	}
+	numberOfRemainingBytesToReceive -= PduInfoPtr->Length;
 }
 
 /* USER CODE END 4 */
