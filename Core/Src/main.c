@@ -102,6 +102,7 @@ typedef enum
 Frame_States expectedFrameState = Any_State;
 
 volatile uint32_t numberOfConsecutiveFramesToSend = 0;
+volatile uint32_t currentConsecutiveFrames = 0;
 volatile uint32_t numberOfConsecutiveFramesToReceive = 0;
 volatile uint32_t numberOfRemainingBytesToSend = 0;
 volatile uint32_t numberOfRemainingBytesToReceive = 0;
@@ -114,7 +115,8 @@ PduInfoType CompletePduInfo;
 
 volatile uint8_t ConsecSN;
 volatile uint16_t currentIndex;
-volatile uint8_t SNFlag;
+volatile uint32_t currentOffset;
+volatile uint16_t startOffset;
 
 /* USER CODE END PV */
 
@@ -397,7 +399,8 @@ Std_ReturnType CanTp_Transmit(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 			}
 			else{
 				frame_type = None;
-				SNFlag = 1;
+				startOffset = currentOffset;
+				ConsecSN = 0;
 				//wait for flow control to reach CanTp_RxIndication in order to change numberOfConsecutiveFramesToSend variable
 			}
 			break;
@@ -413,6 +416,7 @@ Std_ReturnType CanTp_Transmit(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 
 	//Reset the expected frame
 	expectedFrameState = Any_State;
+
 	return E_OK;
 }
 
@@ -534,7 +538,7 @@ void CanTp_encodeFirstFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 	/** Call CanIF_Transmit Function**/
 	numberOfRemainingBytesToSend = (PduInfoPtr->Length - 6);
 	ConsecSN = 1;
-	SNFlag = 0;
+	startOffset = 0;
 	CanIf_Transmit(TxPduId, &EncodedPduInfo);
 }
 void CanTp_encodeConsecutiveFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
@@ -542,13 +546,23 @@ void CanTp_encodeConsecutiveFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 	uint8_t i = 0;
 	EncodedPduInfo.Length = numberOfRemainingBytesToSend > 7 ? 7 : numberOfRemainingBytesToSend;
 	EncodedPduInfo.Data[0]=(0x02 << 4) | ConsecSN;
-	uint8_t offset = (ConsecSN == 1 && !SNFlag)? ConsecSN * 7 - 1: ConsecSN * 7;
+
+	if(startOffset == 0){
+		currentOffset = ConsecSN * 7 -1;
+	}
+	else{
+		currentOffset = startOffset + ConsecSN * 7;
+	}
 	for(i=0 ; i < EncodedPduInfo.Length ; i++)
 	{
-		EncodedPduInfo.Data[i+1] = PduInfoPtr->Data[i + offset];
+		EncodedPduInfo.Data[i+1] = PduInfoPtr->Data[i + currentOffset];
 	}
-	ConsecSN = ConsecSN + 1 > 0xF ? 0 : ConsecSN + 1;
-	SNFlag = ConsecSN ? 1 : 0;
+
+	ConsecSN++;
+	if(ConsecSN > 0xF){
+		startOffset = currentOffset;
+		ConsecSN = 0;
+	}
 	numberOfRemainingBytesToSend -= EncodedPduInfo.Length;
 	CanIf_Transmit(TxPduId, &EncodedPduInfo);
 }
@@ -569,7 +583,7 @@ void CanTp_encodeFlowControlFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 
 	// Set the length of the flow control frame
 	//    EncodedPduInfo.Length = 3;
-
+	ConsecSN = ConsecSN != 1 ? 0 : 1;
 	// Use CanIf_Transmit to send the flow control frame
 	CanIf_Transmit(TxPduId, &EncodedPduInfo);
 }
