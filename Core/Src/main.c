@@ -40,6 +40,9 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+#define CAN_TX 1
+#define CAN_RX 0
+#define CAN_MODE CAN_RX
 #define RX_BUFFER_SIZE 100
 #define CAN_FRAME_LENGTH 8
 #define CAN_MAX_PAYLOAD_LENGTH 7
@@ -63,6 +66,7 @@ volatile int32_t rxCurrentMaxIndex = 0;
 volatile uint8_t rxData = 0;
 volatile uint8_t rxComplete = 0;
 TaskHandle_t xTaskHandle1 = NULL;
+TaskHandle_t xTaskHandle2 = NULL;
 
 typedef struct
 {
@@ -108,28 +112,40 @@ volatile uint32_t numberOfRemainingBytesToSend = 0;
 volatile uint32_t numberOfRemainingBytesToReceive = 0;
 volatile uint32_t availableBuffers = 10;
 void (*App_Callback)(uint32_t RxPduId, PduInfoType* PduInfoPtr) = NULL;
+Std_ReturnType (*CanTp_Callback)(uint32_t RxPduId, PduInfoTRx* PduInfoPtr) = NULL;
 
 PduInfoTRx EncodedPduInfo;
 PduInfoTRx DecodedPduInfo;
 PduInfoType CompletePduInfo;
+PduInfoTRx CanIfPduInfo;
+CAN_RxHeaderTypeDef rxHeader;
+PduInfoTRx* GlobalRxPduInfoPtr;
+PduInfoType* GlobalTxPduInfoPtr;
 
 volatile uint8_t ConsecSN;
 volatile uint16_t currentIndex;
 volatile int32_t currentOffset = -1;
 volatile int32_t startOffset;
-
+volatile int8_t CanIf_Rx;
+volatile int8_t CanTp_Rx;
+volatile int8_t CanTp_Tx;
+volatile uint32_t GlobalRxPduId;
+volatile uint32_t GlobalTxPduId;
+#if CAN_MODE == CAN_TX
+PduInfoType TestPduInfoPtr ={.Data={0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08},.Length=16};
+#endif
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
-void CAN_TX();
-void CANTaskFunction(void *pvParameters);
+void delay_ms(uint32_t milliseconds);
+void PseudoAppCallback(uint32_t TxPduId, PduInfoType* PduInfoPtr);
 void CanTp_Init();
+void CanTp_MainFunction();
 Std_ReturnType CanTp_Transmit(uint32_t TxPduId, PduInfoType* PduInfoPtr);
 Std_ReturnType CanTp_RxIndication (uint32_t RxPduId, PduInfoTRx* PduInfoPtr);
-
 Frame_Type CanTp_GetFrameType(uint8_t PCI);
 void CanTp_setCallback(void (*PTF)(uint32_t TxPduId, PduInfoType* PduInfoPtr));
 void CanTp_encodeSingleFrame(uint32_t TxPduId,PduInfoType* PduInfoPtr);
@@ -142,6 +158,7 @@ void CanTp_decodeConsecutiveFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr);
 void CanTp_decodeFlowControlFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr);
 void CanTp_ConnectData(PduInfoTRx* PduInfoPtr);
 void CanIf_Transmit(uint32_t RxPduId, PduInfoTRx* PduInfoPtr);
+void CanIf_Receive();
 //use this setcallback in the init so that the canIf calls our  CanTp_RxIndication
 void CanIf_setCallback(Std_ReturnType (*IF_Callback)(uint32_t RxPduId, PduInfoTRx* PduInfoPtr));
 
@@ -187,17 +204,24 @@ int main(void)
 	MX_USART2_UART_Init();
 	/* USER CODE BEGIN 2 */
 	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
-	HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxData, 1);
+	//	HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxData, 1);
 
-	xTaskCreate(CANTaskFunction, "CAN_TX", configMINIMAL_STACK_SIZE,NULL, 2, &xTaskHandle1) ;
-	//	PduInfoType PduInfoPtr ={.Data={0x10,0x09,0x01,0x02,0x03,0x04,0x05,0x06},.Length=0};
-	//	CanTp_RxIndication(0, &PduInfoPtr);
+	xTaskCreate(CanIf_Receive, "CANIf_RX", configMINIMAL_STACK_SIZE,NULL, 2, &xTaskHandle1) ;
+	xTaskCreate(CanTp_MainFunction, "CANTp_RX", configMINIMAL_STACK_SIZE,NULL, 3, &xTaskHandle2) ;
+	CanTp_setCallback(PseudoAppCallback);
+	CanTp_Init();
+
+#if CAN_MODE == CAN_TX
+	CanTp_Transmit(0, &TestPduInfoPtr);
+#endif
+
+	//		CanTp_RxIndication(0, &PduInfoPtr);
 	/* USER CODE END 2 */
 
 	/* Call init function for freertos objects (in freertos.c) */
 	MX_FREERTOS_Init();
 	/* Start scheduler */
-	//	osKernelStart();
+	osKernelStart();
 
 	/* We should never get here as control is now taken by the scheduler */
 	/* Infinite loop */
@@ -262,204 +286,260 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	if(!rxComplete){
-		if (rxBufferIndex <= RX_BUFFER_SIZE - 1) {
-			rxBuffer[rxBufferIndex++] = rxData;
-		}
-		else{
+//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+//	if(!rxComplete){
+//		if (rxBufferIndex <= RX_BUFFER_SIZE - 1) {
+//			rxBuffer[rxBufferIndex++] = rxData;
+//		}
+//		else{
+//
+//			// Buffer overflow handling
+//			//			rxBufferIndex = 0;
+//		}
+//		HAL_UART_Receive_IT(&huart2, (uint8_t*) &rxData, 1); // Start next reception
+//		//	HAL_UART_Transmit(&huart2, &rxData, 1, HAL_MAX_DELAY);
+//		if (rxData == 0x0D) { // Example: End of line delimiter
+//			rxComplete = 1;
+//			//			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+//		}
+//	}
+//}
 
-			// Buffer overflow handling
-			//			rxBufferIndex = 0;
-		}
-		HAL_UART_Receive_IT(&huart2, (uint8_t*) &rxData, 1); // Start next reception
-		//	HAL_UART_Transmit(&huart2, &rxData, 1, HAL_MAX_DELAY);
-		if (rxData == 0x0D) { // Example: End of line delimiter
-			rxComplete = 1;
-			//			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-		}
-	}
+void delay_ms(uint32_t milliseconds) {
+	// Assuming 16MHz clock frequency for Nucleo F446RE
+	uint32_t cycles = milliseconds * 16000; // Each millisecond takes 16000 cycles for 16MHz clock
+	__asm__ __volatile__(
+			"1: \n"
+			"subs %[cycles], #1 \n"
+			"bne 1b \n"
+			: [cycles] "+r" (cycles)
+	);
+}
+void PseudoAppCallback(uint32_t TxPduId, PduInfoType* PduInfoPtr){
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
 }
 
-void CAN_TX(){
-	// Define CAN Tx message structure
-	CAN_TxHeaderTypeDef TxHeader;
-	// Define CAN handle
+/**
+ *  @brief CAN interface transmit function
+ *  @param  PduInfoTRx*		: Pointer to message structure contain (Data, Length)
+ *  @param  TxPduId	: PDU ID
+ *  @return None
+ */
+void CanIf_Transmit(uint32_t TxPduId, PduInfoTRx* PduInfoPtr){
+	CAN_TxHeaderTypeDef txHeader;
+	uint32_t txMailbox;
+	if(TxPduId == 0){
+		txHeader.StdId = 0x100;
+	}
 
-
-	// Configure CAN Tx Header
-	TxHeader.StdId = 0x1; // Standard CAN ID
-	TxHeader.ExtId = 0; // No extended ID used
-	TxHeader.RTR = CAN_RTR_DATA; // Data frame
-	TxHeader.IDE = CAN_ID_STD; // Standard ID
-	TxHeader.DLC = 8; // Data length
-	// Prepare data to be sent
-	//	for(int i = 0; i < 8; i++) {
-	//		TxData[i] = '0' + i; // Example data
-	//	}
+	txHeader.ExtId = 0x00;
+	txHeader.IDE = CAN_ID_STD;
+	txHeader.RTR = CAN_RTR_DATA;
+	txHeader.DLC = 8;
 	while(HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0);
-	// Add CAN Tx message
-	if(HAL_CAN_AddTxMessage(&hcan1, &TxHeader, &rxBuffer[rxCurrentMaxIndex - rxBufferIndex], (uint32_t*)CAN_TX_MAILBOX0) != HAL_OK) {
-		// Error handling
+	if (HAL_CAN_AddTxMessage(&hcan1, &txHeader, PduInfoPtr->Data, &txMailbox) != HAL_OK) {
+		// Transmission error
+		Error_Handler();
 
-		//		while(HAL_CAN_IsTxMessagePending(&hcan1, CAN_TX_MAILBOX0));
-		//		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
 	}
-
-
+#if CAN_MODE == CAN_TX
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
+#endif
 }
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan){
-	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK) {
-		// Process received message
-		//		for(uint8_t i = 0; i < 8; i++){
-		//			if(RxData[i] != '0' + i){
-		//				return;
-		//			}
-		//		}
-		HAL_UART_Transmit(&huart2, RxData, 8, HAL_MAX_DELAY);
-		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-		// RxHeader contains received message header
-		// RxData contains received message data
-	}
-}
-
-
-void CANTaskFunction(void *pvParameters) {
-	// Task code goes here
+/**
+ *  @brief CAN interface receive data
+ *  @param  None
+ *  @return None
+ */
+void CanIf_Receive(){
+	uint32_t PDU_ID;
 	while(1){
-		if(rxComplete){
-			rxCurrentMaxIndex = rxBufferIndex;
-			while(rxBufferIndex > 0){
-				if(rxBufferIndex < 8){
-					for(int8_t i = rxBufferIndex; i < 8; i++){
-						rxBuffer[rxCurrentMaxIndex - rxBufferIndex + i] = 0;
-					}
-				}
-				CAN_TX();
-				rxBufferIndex -= 8;
-				vTaskDelay(10);
+		if(CanIf_Rx){
+			CanIf_Rx = 0;
+			CanIfPduInfo.Length = rxHeader.DLC;
+			switch(rxHeader.StdId)
+			{
+			case 0x100 :PDU_ID = 0;
+			break;
+			case 0x200 :PDU_ID = 1;
+			break;
+			case 0x300 :PDU_ID = 2;
+			break;
+			case 0x400 :PDU_ID = 3;
+			break;
+			case 0x500 :PDU_ID = 4;
+			break;
+			case 0x600 :PDU_ID = 5;
+			break;
+			case 0x700 :PDU_ID = 6;
+			break;
+			case 0x800 :PDU_ID = 7;
+			break;
 			}
-			rxBufferIndex = 0;
-			rxComplete = 0;
+
+			if(CanTp_Callback != NULL)
+			{
+				CanTp_Callback(PDU_ID, &CanIfPduInfo);
+			}
 		}
 		vTaskDelay(10);
 	}
+}
+
+void CanIf_setCallback(Std_ReturnType (*IF_Callback)(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)){
+	if(IF_Callback != NULL)
+	{
+		CanTp_Callback = IF_Callback ;
+	}
+}
+
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan1){
+	if (HAL_CAN_GetRxMessage(hcan1, CAN_RX_FIFO0, &rxHeader, CanIfPduInfo.Data) != HAL_OK) {
+		// Reception error
+		Error_Handler();
+	}
+	CanIf_Rx = 1;
 }
 
 void CanTp_Init(){
 	CanIf_setCallback(CanTp_RxIndication);
 }
 
+void CanTp_MainFunction(){
+	while(1){
+		if(CanTp_Rx){
+			CanTp_Rx = 0;
+			//Stop the program if the PduID doesn't equal 0 :)
+			if(GlobalRxPduId != 0){
+				while(1);
+			}
+			//Get the frame type from the
+			Frame_Type frame_type = CanTp_GetFrameType(GlobalRxPduInfoPtr->Data[0]);
+			//	Frame_Type frame_type = First_Frame
+
+			//Call the correct decoder depending on the frame type
+			//extract the length and save it in numberOfRemainingBytesToReceive and connect the data
+			switch(frame_type){
+			case Single_Frame:
+				CanTp_decodeSingleFrame(GlobalRxPduId, GlobalRxPduInfoPtr);
+				break;
+			case First_Frame:
+				CanTp_decodeFirstFrame(GlobalRxPduId, GlobalRxPduInfoPtr);
+				expectedFrameState = FlowControl_Frame_State;
+				CanTp_Transmit(GlobalRxPduId, (PduInfoType*) GlobalRxPduInfoPtr);
+				break;
+			case Consecutive_Frame:
+				CanTp_decodeConsecutiveFrame(GlobalRxPduId, GlobalRxPduInfoPtr);
+				if(numberOfConsecutiveFramesToReceive == 0 && numberOfRemainingBytesToReceive > 0){
+					expectedFrameState = FlowControl_Frame_State;
+					CanTp_Transmit(GlobalRxPduId, (PduInfoType*) GlobalRxPduInfoPtr);
+				}
+				break;
+			case FlowControl_Frame:
+				//adjust the numberOfConsecutiveFramesToSend variable inside a function
+				//based on the number of empty buffers available in the other node
+				//as indicated in the BS (block size) byte of the flow control frame
+				CanTp_decodeFlowControlFrame(GlobalRxPduId, GlobalRxPduInfoPtr);
+				break;
+			default:
+				break;
+			}
+
+			if(frame_type == FlowControl_Frame){
+
+			}
+			else if(numberOfRemainingBytesToReceive == 0){
+				if(App_Callback != NULL){
+					currentIndex = 0;
+					App_Callback(GlobalRxPduId, &CompletePduInfo);
+				}
+			}
+		}
+		else if(CanTp_Tx){
+			//Stop the program if the PduID doesn't equal 0 :)
+			if(GlobalTxPduId != 0){
+				while(1);
+			}
+
+			Frame_Type frame_type = None;
+			if(numberOfRemainingBytesToSend == 0 && expectedFrameState == Any_State){
+				numberOfRemainingBytesToSend = GlobalTxPduInfoPtr->Length;
+				CompletePduInfo.Length = numberOfRemainingBytesToSend;
+				if(GlobalTxPduInfoPtr->Length < 8){
+					frame_type = Single_Frame;
+				}
+				else{
+					frame_type = First_Frame;
+				}
+			}
+
+
+			if(numberOfRemainingBytesToSend > 0 || expectedFrameState == FlowControl_Frame_State){
+
+				if(expectedFrameState == Consecutive_Frame_State){
+					frame_type = Consecutive_Frame;
+				}
+				else if(expectedFrameState == FlowControl_Frame_State){
+					frame_type = FlowControl_Frame;
+				}
+				else
+				{
+
+				}
+
+				//Call the right encoder function according to the frame type
+				//Make sure to adjust the numberOfRemainingBytesToSend variable to know if all the data has been sent
+				//Also make sure to call the CanIf_Transmit method at the end of these functions.
+				switch(frame_type){
+				case Single_Frame:
+					CanTp_encodeSingleFrame(GlobalTxPduId, GlobalTxPduInfoPtr);
+					break;
+				case First_Frame:
+					CanTp_encodeFirstFrame(GlobalTxPduId, GlobalTxPduInfoPtr);
+					frame_type = None;
+					break;
+				case Consecutive_Frame:
+					if(numberOfConsecutiveFramesToSend > 0){
+						numberOfConsecutiveFramesToSend--;
+						CanTp_encodeConsecutiveFrame(GlobalTxPduId, GlobalTxPduInfoPtr);
+					}
+					else{
+						frame_type = None;
+						//wait for flow control to reach CanTp_RxIndication in order to change numberOfConsecutiveFramesToSend variable
+					}
+					break;
+				case FlowControl_Frame:
+					//Check the availableBuffers variable (in our case it's the size of the receive array)
+					CanTp_encodeFlowControlFrame(GlobalTxPduId, GlobalTxPduInfoPtr);
+					break;
+				default:
+					break;
+				}
+			}
+
+			if(numberOfRemainingBytesToSend == 0){
+				//Reset the expected frame
+				expectedFrameState = Any_State;
+				currentOffset = -1;
+				CanTp_Tx = 0;
+			}
+		}
+		vTaskDelay(100);
+	}
+}
+
 Std_ReturnType CanTp_Transmit(uint32_t TxPduId, PduInfoType* PduInfoPtr){
-	//Stop the program if the PduID doesn't equal 0 :)
-	if(TxPduId != 0){
-		while(1);
-	}
-
-	Frame_Type frame_type;
-	numberOfRemainingBytesToSend = PduInfoPtr->Length;
-	CompletePduInfo.Length = numberOfRemainingBytesToSend;
-	if(expectedFrameState == Any_State){
-		if(PduInfoPtr->Length < 8){
-			frame_type = Single_Frame;
-		}
-		else{
-			frame_type = First_Frame;
-		}
-	}
-	while(numberOfRemainingBytesToSend > 0){
-
-		if(expectedFrameState == Consecutive_Frame_State){
-			frame_type = Consecutive_Frame;
-		}
-		else if(expectedFrameState == FlowControl_Frame_State){
-			frame_type = FlowControl_Frame;
-		}
-		else
-		{
-
-		}
-
-		//Call the right encoder function according to the frame type
-		//Make sure to adjust the numberOfRemainingBytesToSend variable to know if all the data has been sent
-		//Also make sure to call the CanIf_Transmit method at the end of these functions.
-		switch(frame_type){
-		case Single_Frame:
-			CanTp_encodeSingleFrame(TxPduId, PduInfoPtr);
-			break;
-		case First_Frame:
-			CanTp_encodeFirstFrame(TxPduId, PduInfoPtr);
-			frame_type = None;
-			break;
-		case Consecutive_Frame:
-			if(numberOfConsecutiveFramesToSend > 0){
-				numberOfConsecutiveFramesToSend--;
-				CanTp_encodeConsecutiveFrame(TxPduId, PduInfoPtr);
-			}
-			else{
-				frame_type = None;
-				//wait for flow control to reach CanTp_RxIndication in order to change numberOfConsecutiveFramesToSend variable
-			}
-			break;
-		case FlowControl_Frame:
-			//Check the availableBuffers variable (in our case it's the size of the receive array)
-			CanTp_encodeFlowControlFrame(TxPduId, PduInfoPtr);
-			return E_OK;
-		default:
-			break;
-		}
-		HAL_Delay(10);
-	}
-
-	//Reset the expected frame
-	expectedFrameState = Any_State;
-	currentOffset = -1;
+	GlobalTxPduInfoPtr = PduInfoPtr;
+	GlobalTxPduId = TxPduId;
+	CanTp_Tx = 1;
 	return E_OK;
 }
 
 Std_ReturnType CanTp_RxIndication (uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
-	//Stop the program if the PduID doesn't equal 0 :)
-	if(RxPduId != 0){
-		while(1);
-	}
-	//Get the frame type from the
-	Frame_Type frame_type = CanTp_GetFrameType(PduInfoPtr->Data[0]);
-	//	Frame_Type frame_type = First_Frame
-
-	//Call the correct decoder depending on the frame type
-	//extract the length and save it in numberOfRemainingBytesToReceive and connect the data
-	switch(frame_type){
-	case Single_Frame:
-		CanTp_decodeSingleFrame(RxPduId, PduInfoPtr);
-		break;
-	case First_Frame:
-		CanTp_decodeFirstFrame(RxPduId, PduInfoPtr);
-		expectedFrameState = FlowControl_Frame_State;
-		CanTp_Transmit(RxPduId, (PduInfoType*) PduInfoPtr);
-		break;
-	case Consecutive_Frame:
-		CanTp_decodeConsecutiveFrame(RxPduId, PduInfoPtr);
-		if(numberOfConsecutiveFramesToReceive == 0){
-			expectedFrameState = FlowControl_Frame_State;
-			CanTp_Transmit(RxPduId, (PduInfoType*) PduInfoPtr);
-		}
-		break;
-	case FlowControl_Frame:
-		//adjust the numberOfConsecutiveFramesToSend variable inside a function
-		//based on the number of empty buffers available in the other node
-		//as indicated in the BS (block size) byte of the flow control frame
-		CanTp_decodeFlowControlFrame(RxPduId, PduInfoPtr);
-		return E_OK;
-	default:
-		break;
-	}
-	if(numberOfRemainingBytesToReceive == 0){
-		if(App_Callback != NULL){
-			currentIndex = 0;
-			App_Callback(RxPduId, &CompletePduInfo);
-		}
-	}
+	GlobalRxPduInfoPtr = PduInfoPtr;
+	GlobalRxPduId = RxPduId;
+	CanTp_Rx = 1;
 	return E_OK;
 }
 
@@ -480,14 +560,6 @@ void CanTp_setCallback(void (*PTF)(uint32_t TxPduId, PduInfoType* PduInfoPtr)){
 	}
 }
 
-
-void CanIf_Transmit(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
-
-}
-
-void CanIf_setCallback(Std_ReturnType (*IF_Callback)(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)){
-
-}
 
 void CanTp_encodeSingleFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 	//	// Check for NULL pointers
@@ -582,6 +654,8 @@ void CanTp_encodeFlowControlFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 void CanTp_decodeSingleFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	// Extract the data length from the first byte of the CAN frame
 	uint32_t dataLength = PduInfoPtr->Data[0] & 0x0F;
+	numberOfRemainingBytesToReceive = dataLength;
+	CompletePduInfo.Length = numberOfRemainingBytesToReceive;
 	int i;
 	// Allocate memory for the data in the PduInfoTRx struct
 	for ( i = 0; i < dataLength; i++) {
@@ -601,6 +675,7 @@ void CanTp_decodeSingleFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 }
 void CanTp_decodeFirstFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	numberOfRemainingBytesToReceive = ((PduInfoPtr->Data[0] & 0x0F) << 8) | PduInfoPtr->Data[1];
+	CompletePduInfo.Length = numberOfRemainingBytesToReceive;
 	DecodedPduInfo.Length=6;
 	uint8_t Counter=0;
 
