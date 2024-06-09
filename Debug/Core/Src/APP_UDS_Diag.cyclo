@@ -1,0 +1,9 @@
+../Core/Src/APP_UDS_Diag.c:25:6:UDS_Init	1
+../Core/Src/APP_UDS_Diag.c:37:6:UDS_Read_Data_Client	3
+../Core/Src/APP_UDS_Diag.c:127:6:UDS_Write_Data_Client	3
+../Core/Src/APP_UDS_Diag.c:222:6:UDS_Control_Session_Default	1
+../Core/Src/APP_UDS_Diag.c:241:6:UDS_Control_Session_Extended	1
+../Core/Src/APP_UDS_Diag.c:267:6:UDS_Send_Security_Client	3
+../Core/Src/APP_UDS_Diag.c:446:6:sendHexArrayAsASCII	2
+../Core/Src/APP_UDS_Diag.c:468:6:UART_ReceiveAndConvert	4
+../Core/Src/APP_UDS_Diag.c:502:9:charToHex	7
