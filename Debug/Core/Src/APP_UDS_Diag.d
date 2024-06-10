@@ -48,7 +48,7 @@ Core/Src/APP_UDS_Diag.o: ../Core/Src/APP_UDS_Diag.c \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h \
- ../Core/Inc/CanIf.h ../Core/Inc/CanTp.h ../Core/Inc/APP_UDS_Diag.h
+ ../Core/Inc/CanIf.h ../Core/Inc/CanTp.h
 ../Core/Inc/APP_UDS_Diag.h:
 ../Core/Inc/APP_UDS_Diag_CFG.h:
 ../Core/Inc/can.h:
@@ -103,4 +103,3 @@ Core/Src/APP_UDS_Diag.o: ../Core/Src/APP_UDS_Diag.c \
 ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h:
 ../Core/Inc/CanIf.h:
 ../Core/Inc/CanTp.h:
-../Core/Inc/APP_UDS_Diag.h:

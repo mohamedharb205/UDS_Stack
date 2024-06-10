@@ -8,8 +8,9 @@
 #ifndef INC_CANTP_H_
 #define INC_CANTP_H_
 
-#include "APP_UDS_Diag.h"
-
+#include "stdint.h"
+#include "CanIf.h"
+#include "cmsis_os.h"
 
 typedef enum
 {
@@ -26,6 +27,12 @@ typedef enum
 	Consecutive_Frame_State,
 	FlowControl_Frame_State
 }Frame_States;
+
+typedef struct
+{
+	uint8_t Data[4096];
+	uint32_t Length;
+}PduInfoType;
 
 void CanTp_Init();
 void CanTp_MainFunction();

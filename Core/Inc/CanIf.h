@@ -12,11 +12,6 @@
 #include "can.h"
 #include "cmsis_os.h"
 
-typedef struct
-{
-	uint8_t Data[4096];
-	uint32_t Length;
-}PduInfoType;
 
 typedef struct
 {

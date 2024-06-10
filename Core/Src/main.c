@@ -46,7 +46,7 @@
 /* USER CODE BEGIN PM */
 #define CAN_TX 1
 #define CAN_RX 0
-#define CAN_MODE CAN_TX
+#define CAN_MODE CAN_RX
 
 /*
  *
@@ -71,6 +71,21 @@
  *
  *
  */
+
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+
+/* USER CODE BEGIN PV */
+
+extern CAN_HandleTypeDef hcan1;
+extern UART_HandleTypeDef huart2;
+
+
+TaskHandle_t xTaskHandle1 = NULL;
+TaskHandle_t xTaskHandle2 = NULL;
+TaskHandle_t xTaskHandle3 = NULL;
 
 #if CAN_MODE == CAN_TX
 /**********App *******************/
@@ -102,32 +117,12 @@ const uint8_t* Menu_Msg_Arr[] =
 		(uint8_t*) "\r\nO --> Write Oil Temperature.\r\n",
 		(uint8_t*) "\r\nP --> Write Oil Pressure.\r\n"
 };
-#endif
-/* USER CODE END PM */
-
-/* Private variables ---------------------------------------------------------*/
-
-/* USER CODE BEGIN PV */
-
-extern CAN_HandleTypeDef hcan1;
-extern UART_HandleTypeDef huart2;
-
-
-TaskHandle_t xTaskHandle1 = NULL;
-TaskHandle_t xTaskHandle2 = NULL;
-TaskHandle_t xTaskHandle3 = NULL;
-
-
-#if CAN_MODE == CAN_RX
-
+#else
 
 extern TIM_HandleTypeDef htim6;
 volatile uint8_t count;
 //extern volatile uint8_t global_sec_flag;
 extern volatile uint8_t global_session;
-#else
-extern uint8_t* seed;
-extern uint8_t* key;
 
 #endif
 
@@ -197,17 +192,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 		break;
 
 	case 'E':
-		//Tester Presenter Function
 		UDS_Tester_Presenter_Client();
 		break;
 
 	case 'F':
-		//PduInfoType Glgl;
-		//Glgl.Data[0] = 0x7F;
-		//Glgl.Data[1] = 0xF1;
-		//Glgl.Data[2] = 0x3D;
-		//Glgl.Length = 3;
-		//UDS_Client_Callback(&Glgl);
 		UDS_Control_Session_Default();
 		break;
 
@@ -252,8 +240,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	case 'K':
 		Sub_Fun sub_fun_key = Key;
 		// A Temporary example for a seed (Accessed in CallBack)
-		uint8_t data[Seed_Key_Lenght] = {0x42, 0x31, 0x00, 0xD0};
-		seed = data;
 		UDS_Send_Security_Client(sub_fun_key);
 		break;
 
@@ -318,11 +304,7 @@ int main(void)
 	xTaskCreate(UDS_MainFunction, "UDS_RX", configMINIMAL_STACK_SIZE,NULL, 2, &xTaskHandle3) ;
 #else
 	CanTp_setCallback(server_call_back);
-	//	reset_timer();
-	//	HAL_TIM_Base_Start_IT(&htim6);
-	//	stop_timer();
 #endif
-	//HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxData, 1);
 
 
 	xTaskCreate(CanIf_Receive, "CANIf_RX", configMINIMAL_STACK_SIZE,NULL, 2, &xTaskHandle1) ;

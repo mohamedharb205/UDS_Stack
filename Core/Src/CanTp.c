@@ -5,9 +5,7 @@
  *      Author: DELL
  */
 
-#include "CanIf.h"
 #include "CanTp.h"
-#include "cmsis_os.h"
 
 #define RX_BUFFER_SIZE 100
 #define CAN_FRAME_LENGTH 8
