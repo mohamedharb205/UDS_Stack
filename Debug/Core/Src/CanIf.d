@@ -1,4 +1,5 @@
-Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
+Core/Src/CanIf.o: ../Core/Src/CanIf.c ../Core/Inc/CanIf.h \
+ ../Core/Inc/can.h ../Core/Inc/main.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -44,12 +45,9 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/semphr.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h \
- ../Core/Inc/can.h ../Core/Inc/main.h ../Core/Inc/tim.h \
- ../Core/Inc/usart.h ../Core/Inc/gpio.h ../Core/Inc/APP_UDS_Diag.h \
- ../Core/Inc/APP_UDS_Diag_CFG.h ../Core/Inc/can.h ../Core/Inc/usart.h \
- ../Core/Inc/gpio.h ../Core/Inc/CanIf.h ../Core/Inc/CanTp.h \
- ../Core/Inc/APP_UDS_Diag.h ../Core/Inc/CanTp.h ../Core/Inc/CanIf.h
+ ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h
+../Core/Inc/CanIf.h:
+../Core/Inc/can.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -97,18 +95,3 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h:
-../Core/Inc/can.h:
-../Core/Inc/main.h:
-../Core/Inc/tim.h:
-../Core/Inc/usart.h:
-../Core/Inc/gpio.h:
-../Core/Inc/APP_UDS_Diag.h:
-../Core/Inc/APP_UDS_Diag_CFG.h:
-../Core/Inc/can.h:
-../Core/Inc/usart.h:
-../Core/Inc/gpio.h:
-../Core/Inc/CanIf.h:
-../Core/Inc/CanTp.h:
-../Core/Inc/APP_UDS_Diag.h:
-../Core/Inc/CanTp.h:
-../Core/Inc/CanIf.h:

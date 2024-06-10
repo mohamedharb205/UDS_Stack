@@ -1,0 +1,4 @@
+../Core/Src/CanIf.c:18:6:HAL_CAN_RxFifo0MsgPendingCallback	16	static
+../Core/Src/CanIf.c:32:6:CanIf_Transmit	48	static
+../Core/Src/CanIf.c:57:6:CanIf_Receive	16	static
+../Core/Src/CanIf.c:92:6:CanIf_setCallback	16	static
