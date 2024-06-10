@@ -137,7 +137,7 @@ void UDS_Write_Data_Client(DID did, uint32_t data)
 		Write_Data_Client.Data[DID_2] = 0x3D;
 
 	    // Assuming data is 2 bytes
-		Write_Data_Client.Data[Data_DID] = (data >> 8) & 0xFF; // Most significant byte of data
+		Write_Data_Client.Data[Data_DID] = data >> 8; // Most significant byte of data
 		Write_Data_Client.Data[Data_DID+1] = data & 0xFF;	   // Least significant byte of data
 
         Write_Data_Client.Length = 6; // SID + DID + Data
@@ -163,11 +163,11 @@ void UDS_Write_Data_Client(DID did, uint32_t data)
 	}
 
 	//Sending Frame to Can TP
-	//CanTp_Transmit(0, &Write_Data_Client);
+	CanTp_Transmit(0, &Write_Data_Client);
 
 	//For Debugging
 	//HAL_UART_Transmit(&huart2, "\r\nWrite Frame Client:", 50, HAL_MAX_DELAY);
-	sendHexArrayAsASCII(Write_Data_Client.Data,  Write_Data_Client.Length);
+//	sendHexArrayAsASCII(Write_Data_Client.Data,  Write_Data_Client.Length);
 	//HAL_UART_Transmit(&huart2, "\r\n", 50, HAL_MAX_DELAY);
 }
 
@@ -280,7 +280,7 @@ void UDS_Send_Security_Client(Sub_Fun sub_fun)
 	{
 		Send_Security_Seed.Data[Sub_F] = 0x02;//Sub_Fun Key
 		Send_Security_Seed.Length = 3+Seed_Key_Lenght;
-		UART_ReceiveAndConvert(((Send_Security_Seed.Length)-2)*2,&Send_Security_Seed);
+		UART_ReceiveAndConvert(8,&Send_Security_Seed);
 		//security_key.Seed = seed;
 		//Prepare Key From Seed
 		//uint8_t security_key_counter = Seed_Key_Lenght-1;
@@ -489,7 +489,7 @@ void UART_ReceiveAndConvert(uint8_t RX_BUFFER_SIZE, PduInfoType* PduInfoType_Ptr
         for (uint16_t i = 0; i < length; i += 2) {
             hexValue = (charToHex(rxBuffer[i]) << 4) | charToHex(rxBuffer[i + 1]);
             //update hexvalue into frame
-            PduInfoType_Ptr->Data[(i / 2)+2] = hexValue;
+            PduInfoType_Ptr->Data[(i / 2)+3] = hexValue;
             hexOutput[i / 2] = hexValue;
             // Optionally, send the hexadecimal values back via UART
             //HAL_UART_Transmit(&huart2, hexOutput, 1/*length / 2*/, HAL_MAX_DELAY);

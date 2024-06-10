@@ -15,11 +15,11 @@ typedef enum {
 } ClientMenu;
 
 
-typedef enum {
-	Default_Session = 0,
-	Extended_Session=3,
-
-} SessionType;
+//typedef enum {
+//	Default_Session = 1,
+//	Extended_Session=3,
+//
+//} SessionType;
 
 
 typedef enum {
@@ -56,8 +56,8 @@ typedef enum {
 	Oil_Temp_Second_byte=0x3D,
 	Oil_Pressure_First_byte=0xF5,
 	Oil_Pressure_Second_byte=0x3D,
-	Oil_Pressure_Third_byte=0x00,
-	Oil_Pressure_forth_byte=0x00,
+//	Oil_Pressure_Third_byte=0x00,
+//	Oil_Pressure_forth_byte=0x00,
 
 
 }DID;

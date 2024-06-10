@@ -203,16 +203,15 @@ volatile uint32_t GlobalTxPduId;
 
 #if CAN_MODE == CAN_RX
 volatile uint8_t global_sec_flag = 0;
-volatile uint8_t global_session = Default_Session;
+volatile uint8_t global_session = DefaultSession;
 volatile uint8_t flag_sub_fun = 0;
 volatile uint8_t Security_Service_Availability_Flag = Not_Available;
 //uint8_t seed =50 ; // for example
-volatile uint32_t oil_temp_var =50;
-volatile uint32_t oil_pressure_var = 60;
 /*Security Variables */
 volatile uint32_t Sec_u32SeedValue = 0 ;
 Security_Access_State Sec_State = Un_Secure ;
-
+volatile uint32_t Oil_Pressure_var = 0x778899AA;
+volatile uint32_t Oil_Temp_var = 0x5566;
 ServiceInfo pos_Response;
 PduInfoType *PduDataPTR;
 ServiceInfo Control;
@@ -365,7 +364,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 	case 'O':
 		DID Write_Oil_Temp = Oil_Temp;
-		uint32_t Write_Oil_Temp_data = 0x54321044;
+		uint32_t Write_Oil_Temp_data = 0x5432;
 		UDS_Write_Data_Client(Write_Oil_Temp, Write_Oil_Temp_data);
 		break;
 
@@ -800,6 +799,7 @@ void CanTp_encodeSingleFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 	// Ensure the data length does not exceed the maximum payload length
 	uint32_t dataLength = PduInfoPtr->Length;
 	EncodedPduInfo.Length = PduInfoPtr->Length;
+	numberOfRemainingBytesToSend -= dataLength;
 	//	if (dataLength > CAN_MAX_PAYLOAD_LENGTH) {
 	//		return E_NOK; // Return E_NOK for data length exceeding CAN payload length
 	//	}
@@ -1037,12 +1037,12 @@ void UDS_MainFunction()
 					switch ( UDS_Struct->Data[Sub_F] )
 					{
 
-					case Default_Session :
+					case DefaultSession :
 						HAL_UART_Transmit(&huart2, (uint8_t*) "\r\n It's Default Session ! .\r\n", strlen("\r\n It's Default Session ! .\r\n"), HAL_MAX_DELAY);
 						//UDS_Read_Data_Client(Frame_Info.DID);
 						break ;
 
-					case Extended_Session :
+					case ExtendedSession :
 						HAL_UART_Transmit(&huart2,(uint8_t*) "\r\n It's Extended Session ! .\r\n", strlen("\r\n It's Extended Session ! .\r\n"), HAL_MAX_DELAY);
 						//UDS_Read_Data_Client(Frame_Info.DID);
 						break ;
@@ -1148,6 +1148,16 @@ void Display_Menu(void)
 		break;
 
 	default:
+		HAL_UART_Transmit(&huart2, Menu_Msg_Arr[0], strlen((char*)Menu_Msg_Arr[0]), HAL_MAX_DELAY);    //{"\r\nHello, Main Menu.\r\n"
+		HAL_UART_Transmit(&huart2, Menu_Msg_Arr[1], strlen((char*)Menu_Msg_Arr[1]), HAL_MAX_DELAY);    //"\r\n please Choose Your Service.\r\n",
+		HAL_UART_Transmit(&huart2, Menu_Msg_Arr[2], strlen((char*)Menu_Msg_Arr[2]), HAL_MAX_DELAY);    //"\r\nA --> Control Session.\r\n",
+		HAL_UART_Transmit(&huart2, Menu_Msg_Arr[3], strlen((char*)Menu_Msg_Arr[3]), HAL_MAX_DELAY);    //"\r\nB --> Read Data.\r\n",
+		HAL_UART_Transmit(&huart2, Menu_Msg_Arr[4], strlen((char*)Menu_Msg_Arr[4]), HAL_MAX_DELAY);    //"\r\nC --> Write Data.\r\n",
+		HAL_UART_Transmit(&huart2, Menu_Msg_Arr[5], strlen((char*)Menu_Msg_Arr[5]), HAL_MAX_DELAY);    //"\r\nD --> Security Access.\r\n",
+		HAL_UART_Transmit(&huart2, Menu_Msg_Arr[6], strlen((char*)Menu_Msg_Arr[6]), HAL_MAX_DELAY);    //"\r\nE --> Tester Representer.\r\n"};
+		HAL_UART_Transmit(&huart2, Menu_Msg_Arr[17], strlen((char*)Menu_Msg_Arr[17]), HAL_MAX_DELAY);    //"\r\n=========================================.\r\n"};
+		break;
+
 		break;
 		//Nothing
 	}
@@ -1169,6 +1179,7 @@ uint32_t Sec_u32GetKey (void)
 {
 	uint32_t Local_u32KeyValue = 0 ;
 	Local_u32KeyValue = Sec_u32SeedValue + Sec_u32GetAlgorithm() ;
+//	Local_u32KeyValue = 0x01020304 + Sec_u32GetAlgorithm() ;
 	return Local_u32KeyValue;
 }
 
@@ -1180,18 +1191,21 @@ uint8_t Sec_uint32SecurityAccess (PduInfoType * Ptr)
 	if (Ptr->Data[2] == Seed)
 	{
 		/*Generate Seed */
-		Sec_u32GetSeed();
+				Sec_u32GetSeed();
 
 		/*Send Frame with Positive Response */
 		//		Frame_Info Response ;
 		pos_Response.SID 		= Security_Service ;
 		pos_Response.SUB_FUNC	= Seed ;
+		pos_Response.DID_Length=0;
+		pos_Response.Data_Length=4;
+//		for(int i = 1; i < pos_Response.Data_Length + 1; i++){
+//			pos_Response.Data[i-1] = i;
+//		}
 		for(int i =0 ; i< 4; i++)
 		{
-			pos_Response.Data[i] 		=(uint8_t) Sec_u32SeedValue>>(24-(i*8)) ;
+			pos_Response.Data[i] 		=(uint8_t) (Sec_u32SeedValue>>(24-(i*8))) ;
 		}
-		pos_Response.Data_Length=4;
-		pos_Response.DID_Length=0;
 
 		UDS_Send_Pos_Res(&pos_Response) ;
 	}
@@ -1203,13 +1217,18 @@ uint8_t Sec_uint32SecurityAccess (PduInfoType * Ptr)
 		{
 			/*Change the state of security */
 			Sec_State = Secure ;
+			global_sec_flag = Secure;
 			/*Send Positive Response */
 			pos_Response.SID= Ptr->Data[1];
-			//UDS_Send_Pos_Res();
+			pos_Response.SUB_FUNC = Key;
+			pos_Response.DID_Length = 0;
+			pos_Response.Data_Length = 0;
+			UDS_Send_Pos_Res(&pos_Response);
 		}
 		else
 		{
 			Sec_State = Un_Secure ;
+			global_sec_flag = Un_Secure;
 			UDS_Send_Neg_Res(Ptr->Data[1] , NRC_sec_key_seed) ;
 		}
 	}
@@ -1227,62 +1246,35 @@ uint8_t Sec_uint32SecurityAccess (PduInfoType * Ptr)
 /***************************************************************************************************/
 void UDS_Read_Data_Server(uint8_t* data)
 {
-	ServiceInfo Read_Data_Server ;
-	Read_Data_Server.SID = 0x22;
-	Read_Data_Server.SUB_FUNC = -1;
+	pos_Response.SUB_FUNC = -1;
 	uint8_t NRC = 2;
+	//Send +ve responce
+	pos_Response.SID = Read_Service ;
+	pos_Response.DID_Length=2;
+
 	//if DID --> Oil_Temp
-	if((data[1] == 0xF1) && (data[2] == 0x3D) )
+	if((data[DID_1] == Oil_Temp_First_byte) && (data[DID_2] == Oil_Temp_Second_byte) )
 	{
-		Read_Data_Server.DID[0] = 0xF1;
-		Read_Data_Server.DID[1] = 0x3D;
-		Read_Data_Server.DID_Length = 2;
-		//For Debugging
-		//HAL_UART_Transmit(&huart2, "\r\nRead Frame Client DID:", 50, HAL_MAX_DELAY);
-		//sendHexArrayAsASCII(Read_Data_Server.DID, Read_Data_Server.DID_Length );
-		//HAL_UART_Transmit(&huart2, "\r\n", 50, HAL_MAX_DELAY);
-
-		Read_Data_Server.Data[0] = 0x55; //value of Oil_Temp
-		Read_Data_Server.Data[1] = 0x66; //value of Oil_Temp
-		Read_Data_Server.Data_Length = 2;
-
-		pos_Response.SID = Read_Service ;
-		pos_Response.DID[0]=0xF1;
-		pos_Response.DID[1]=0x3D;
-		pos_Response.DID_Length=2;
-		pos_Response.Data[0]=0x55;
-		pos_Response.Data[1]=0x66;
+		pos_Response.DID[0]=Oil_Temp_First_byte;
+		pos_Response.DID[1]=Oil_Temp_Second_byte;
+		pos_Response.Data[0]=Oil_Temp_var>>8;
+		pos_Response.Data[1]=Oil_Temp_var & 0xFF;
 		pos_Response.Data_Length = 2;
-
 
 		UDS_Send_Pos_Res(&pos_Response);
 		//	UDS_Send_Pos_Res(Read_Data_Server);
 	}//if DID --> Oil_Pressure
-	else if((data[1] == 0xF5) && (data[2] == 0x3D) )
+	else if((data[DID_1] == Oil_Pressure_First_byte) && (data[DID_2] == Oil_Pressure_Second_byte) )
 	{
-		Read_Data_Server.DID[0] = 0xF5;
-		Read_Data_Server.DID[1] = 0x3D;
-		Read_Data_Server.DID_Length = 2;
-		//For Debugging
-		//HAL_UART_Transmit(&huart2, "\r\nRead Frame Client DID:", 50, HAL_MAX_DELAY);
-		//sendHexArrayAsASCII(Read_Data_Server.DID, Read_Data_Server.DID_Length );
-		//HAL_UART_Transmit(&huart2, "\r\n", 50, HAL_MAX_DELAY);
-		Read_Data_Server.Data[0] = 0x77; //value of Oil_Pressure
-		Read_Data_Server.Data[1] = 0x88; //value of Oil_Pressure
-		Read_Data_Server.Data[2] = 0x99; //value of Oil_Pressure
-		Read_Data_Server.Data[3] = 0xAA; //value of Oil_Pressure
-		Read_Data_Server.Data_Length = 4;
-		//Send +ve responce
-		pos_Response.SID = Read_Service ;
-		pos_Response.DID[0]=0xF1;
-		pos_Response.DID[1]=0x3D;
-		pos_Response.DID_Length=2;
-		pos_Response.Data[0]=0x77;
-		pos_Response.Data[1]=0x88;
-		pos_Response.Data[2]=0x99;
-		pos_Response.Data[3]=0xAA;
+		pos_Response.DID[0]=Oil_Pressure_First_byte;
+		pos_Response.DID[1]=Oil_Pressure_Second_byte;
+		pos_Response.Data[0]=Oil_Pressure_var>>24;
+		pos_Response.Data[1]=Oil_Pressure_var>>16;
+		pos_Response.Data[2]=Oil_Pressure_var>>8;
+		pos_Response.Data[3]=Oil_Pressure_var & 0xFF;
 
 		pos_Response.Data_Length = 4;
+
 		UDS_Send_Pos_Res(&pos_Response);
 
 		//For Debugging
@@ -1293,7 +1285,7 @@ void UDS_Read_Data_Server(uint8_t* data)
 	else
 	{
 		//otherwize: send -ve responce
-		UDS_Send_Neg_Res(Read_Data_Server.SID, NRC);
+		UDS_Send_Neg_Res(Read_Service, NRC);
 	}
 
 }
@@ -1375,49 +1367,43 @@ void server_call_back(uint32_t TxPduId, PduInfoType* ptr)
 		{
 
 			//	printf("send_ser_sec() +ive resp \n");
-			HAL_UART_Transmit(&huart2, (const uint8_t*)" send_ser_sec() +ive resp change the flag \r\n", 50, 100 ); // delete this after you put your func
+			//			HAL_UART_Transmit(&huart2, (const uint8_t*)" send_ser_sec() +ive resp change the flag \r\n", 50, 100 ); // delete this after you put your func
 
 			//		send_ser_sec() ; // send seed
 
 			// (write here +ive resp for security) ------------------------> here
-			pos_Response.SID=ptr->Data[1];
-			for(int i =0 ; i< 2 ; i++)
-			{
-				pos_Response.DID[i]= ptr->Data[2+i];
-			}
-			pos_Response.DID_Length=2;
 
-			pos_Response.Data_Length=0;
 			Sec_uint32SecurityAccess(PduDataPTR);
+			//			UDS_Send_Pos_Res(&pos_Response) ;
 		}
 
 
-		else if (ptr->Data[1] == Write_Service && global_sec_flag ==1 && global_session == Extended_Session  )
+		else if (ptr->Data[1] == Write_Service && global_sec_flag ==1 && global_session == ExtendedSession  )
 		{
 			//printf("u are in Write_Service\n");
-			HAL_UART_Transmit(&huart2, (const uint8_t*)" u are in Write_Service \r\n", 50, 100 );
-			// send write response
-			//	printf("UDS_Write_Data_Server() \n");
-			HAL_UART_Transmit(&huart2, (const uint8_t*)" UDS_Write_Data_Server() \r\n", 50, 100 ); // delete it after put your func
+			//			HAL_UART_Transmit(&huart2, (const uint8_t*)" u are in Write_Service \r\n", 50, 100 );
+			//			// send write response
+			//			//	printf("UDS_Write_Data_Server() \n");
+			//			HAL_UART_Transmit(&huart2, (const uint8_t*)" UDS_Write_Data_Server() \r\n", 50, 100 ); // delete it after put your func
 
 			// ptr->Data write with +ive resp
 
 
 			UDS_Write_Data_Server(ptr->Data,  ptr->Data[0]);
 		}
-		else if (ptr->Data[1] == Write_Service && global_sec_flag == 0 && global_session == Extended_Session )
+		else if (ptr->Data[1] == Write_Service && global_sec_flag == 0 && global_session == ExtendedSession )
 		{
 			//printf("u are not in Write_Service\n");
-			HAL_UART_Transmit(&huart2, (const uint8_t*)" u are not in Write_Service \r\n", 50, 100 );
-			// send -ive response
-			//printf("UDS_Write_Data_Server() \n");
-			HAL_UART_Transmit(&huart2, (const uint8_t*)"UDS_Write_Data_Server() \r\n", 50, 100 ); // delete this after put your func
+			//			HAL_UART_Transmit(&huart2, (const uint8_t*)" u are not in Write_Service \r\n", 50, 100 );
+			//			// send -ive response
+			//			//printf("UDS_Write_Data_Server() \n");
+			//			HAL_UART_Transmit(&huart2, (const uint8_t*)"UDS_Write_Data_Server() \r\n", 50, 100 ); // delete this after put your func
 			// (write here -ive resp for write security ) ------------------------> here
 
 			UDS_Send_Neg_Res(ptr->Data[1], NRC_WRITE_secuirty);
 
 		}
-		else if (ptr->Data[1] == Write_Service  && global_session == Default_Session)
+		else if (ptr->Data[1] == Write_Service  && global_session == DefaultSession)
 		{
 			// (write here -ive resp for write session (NRC ) ------------------------> here
 
@@ -1482,23 +1468,23 @@ void server_call_back(uint32_t TxPduId, PduInfoType* ptr)
 }
 
 /**********************************************************************************************/
-uint8_t check_DID(uint16_t DID, uint32_t data)
-{
-	if (Oil_Temp == DID)
-	{
-		oil_temp_var = (data>>16); // update the 2 bytes data for Oil temperature
-		return 1; // Indicating success
-	}
-	else if (Oil_Pressure == DID)
-	{
-		oil_pressure_var = data ; // update the 4 bytes data for Oil pressure
-		return 1; // Indicating success
-	}
-	else
-	{
-		return 0; // Indicating failure
-	}
-}
+//uint8_t check_DID(uint16_t DID, uint32_t data)
+//{
+//	if (Oil_Temp == DID)
+//	{
+//		oil_temp_var = (data>>16); // update the 2 bytes data for Oil temperature
+//		return 1; // Indicating success
+//	}
+//	else if (Oil_Pressure == DID)
+//	{
+//		oil_pressure_var = data ; // update the 4 bytes data for Oil pressure
+//		return 1; // Indicating success
+//	}
+//	else
+//	{
+//		return 0; // Indicating failure
+//	}
+//}
 
 
 void UDS_Write_Data_Server(uint8_t* received_data, uint16_t received_length)
@@ -1542,12 +1528,18 @@ void UDS_Write_Data_Server(uint8_t* received_data, uint16_t received_length)
 
 
 	pos_Response.SID = Write_Service ;
-	pos_Response.DID[0]=(received_data[2] << 8) ;
+	pos_Response.DID[0]=received_data[2];
 	pos_Response.DID[1]=received_data[3];
 	pos_Response.DID_Length=2;
 	pos_Response.Data_Length = 0;
+	pos_Response.SUB_FUNC = -1;
 
-
+	if(received_data[DID_1] == Oil_Temp_First_byte && received_data[DID_2] == Oil_Temp_Second_byte){
+		Oil_Temp_var = received_data[4] << 8 | received_data[5];
+	}
+	else if(received_data[DID_1] == Oil_Pressure_First_byte && received_data[DID_2] == Oil_Pressure_Second_byte){
+		Oil_Pressure_var = received_data[4] << 24 | received_data[5] << 16 | received_data[6] << 8 | received_data[7];
+	}
 	UDS_Send_Pos_Res(&pos_Response);
 
 
@@ -1603,7 +1595,6 @@ void UDS_Send_Pos_Res(ServiceInfo* Response)
 
 void UDS_Send_Neg_Res(uint8_t SID, uint8_t NRC)
 {
-	PduInfoType msg;
 	msg.Data[0] = 4;
 	msg.Data[1] = 0x7F;
 	msg.Data[2] = SID;
@@ -1625,6 +1616,7 @@ void UDS_Send_Neg_Res(uint8_t SID, uint8_t NRC)
  * @param  htim : TIM handle
  * @retval None
  */
+#if CAN_MODE == CAN_RX
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	/* USER CODE BEGIN Callback 0 */
@@ -1637,6 +1629,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	/* USER CODE END Callback 1 */
 }
+#endif
 
 /**
  * @brief  This function is executed in case of error occurrence.
