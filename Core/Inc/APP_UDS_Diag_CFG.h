@@ -15,13 +15,6 @@ typedef enum {
 } ClientMenu;
 
 
-//typedef enum {
-//	Default_Session = 1,
-//	Extended_Session=3,
-//
-//} SessionType;
-
-
 typedef enum {
 	Control_Service = 0x10,
 	Read_Service = 0x22,
@@ -30,23 +23,6 @@ typedef enum {
 	Tester_Representer_Service = 0x3E,
 
 } Services;
-
-
-typedef enum {
-	Not_Available = 0x00,
-	Available = 0x01,
-
-} Availability;
-
-
-typedef enum {
-	Control_Service_Availability = Available,
-	Read_Service_Availability = Available,
-	Security_Service_Availability = Available,
-	Write_Service_Availability = Available,
-	Tester_Representer_Service_Availability = Available,
-
-} Services_Availability;
 
 
 typedef enum {
@@ -117,7 +93,7 @@ typedef enum
 typedef enum
 {
 	Key_Code = 0x05,
-	Seed_Key_Lenght = 4
+	Seed_Key_Length = 4
 }Security_Info;
 
 
@@ -130,7 +106,6 @@ typedef struct
 
 typedef enum {
 	PCI = 0,
-	Neg_Res=1,
 	SID = 1,
 	DID_1 = 2,
 	DID_2 = 3,
@@ -138,6 +113,10 @@ typedef enum {
 	Data_DID = 4 ,
 	Data_Sub_Fun = 3 ,
 
-} Indecis;
+	Neg_Res_INDEX=1,
+	SID_NR_INDEX=2,
+	NRC_INDEX=3,
+
+}Indices;
 
 #endif

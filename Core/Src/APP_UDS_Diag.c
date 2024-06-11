@@ -23,7 +23,6 @@ PduInfoType PduInfoTypePtr;
 volatile uint8_t global_sec_flag = 0;
 volatile uint8_t global_session = DefaultSession;
 
-volatile uint8_t Security_Service_Availability_Flag = Not_Available;
 //uint8_t seed =50 ; // for example
 /*Security Variables */
 volatile uint32_t Sec_u32SeedValue = 0 ;
@@ -169,11 +168,11 @@ void UDS_Write_Data_Client(DID did, uint32_t data)
 		Write_Data_Client.Data[DID_1] = 0xF1;
 		Write_Data_Client.Data[DID_2] = 0x3D;
 
-	    // Assuming data is 2 bytes
+		// Assuming data is 2 bytes
 		Write_Data_Client.Data[Data_DID] = data >> 8; // Most significant byte of data
 		Write_Data_Client.Data[Data_DID+1] = data & 0xFF;	   // Least significant byte of data
 
-        Write_Data_Client.Length = 6; // SID + DID + Data
+		Write_Data_Client.Length = 6; // SID + DID + Data
 
 
 
@@ -200,7 +199,7 @@ void UDS_Write_Data_Client(DID did, uint32_t data)
 
 	//For Debugging
 	//HAL_UART_Transmit(&huart2, "\r\nWrite Frame Client:", 50, HAL_MAX_DELAY);
-//	sendHexArrayAsASCII(Write_Data_Client.Data,  Write_Data_Client.Length);
+	//	sendHexArrayAsASCII(Write_Data_Client.Data,  Write_Data_Client.Length);
 	//HAL_UART_Transmit(&huart2, "\r\n", 50, HAL_MAX_DELAY);
 }
 
@@ -312,13 +311,13 @@ void UDS_Send_Security_Client(Sub_Fun sub_fun)
 	else if(sub_fun == Key)
 	{
 		Send_Security_Seed.Data[Sub_F] = 0x02;//Sub_Fun Key
-		Send_Security_Seed.Length = 3+Seed_Key_Lenght;
+		Send_Security_Seed.Length = 3+Seed_Key_Length;
 		UART_ReceiveAndConvert(8,&Send_Security_Seed);
 		//security_key.Seed = seed;
 		//Prepare Key From Seed
 		//uint8_t security_key_counter = Seed_Key_Lenght-1;
 		//uint8_t Send_Security_Seed_counter = 2;
-/*
+		/*
 		while(security_key_counter >= 0 )
 		{
 			//sendHexArrayAsASCII(security_key.Key,4);
@@ -330,7 +329,7 @@ void UDS_Send_Security_Client(Sub_Fun sub_fun)
 			Send_Security_Seed.Data[Send_Security_Seed_counter] = security_key.Key[security_key_counter];
 			Send_Security_Seed_counter++;
 		}
-*/
+		 */
 		//key = security_key.Key;
 
 	}
@@ -479,70 +478,70 @@ void UDS_Send_Security_Client(Sub_Fun sub_fun)
 void sendHexArrayAsASCII(uint8_t* hexArray, uint16_t length)
 {
 
-    // Buffer to hold the ASCII representation (2 chars per byte + 1 for null terminator)
-    char asciiBuffer[length * 2 + 1];
-    char* pBuffer = asciiBuffer;
+	// Buffer to hold the ASCII representation (2 chars per byte + 1 for null terminator)
+	char asciiBuffer[length * 2 + 1];
+	char* pBuffer = asciiBuffer;
 
-    // Convert each byte to its ASCII representation
-    for (uint16_t i = 0; i < length; i++) {
-        sprintf(pBuffer, "%02X", hexArray[i]);
-        pBuffer += 2;
-    }
+	// Convert each byte to its ASCII representation
+	for (uint16_t i = 0; i < length; i++) {
+		sprintf(pBuffer, "%02X", hexArray[i]);
+		pBuffer += 2;
+	}
 
-    // Null-terminate the string
-    *pBuffer = '\0';
+	// Null-terminate the string
+	*pBuffer = '\0';
 
-    // Transmit the ASCII string over UART
-    HAL_UART_Transmit(&huart2, (uint8_t*)asciiBuffer, strlen(asciiBuffer), HAL_MAX_DELAY);
+	// Transmit the ASCII string over UART
+	HAL_UART_Transmit(&huart2, (uint8_t*)asciiBuffer, strlen(asciiBuffer), HAL_MAX_DELAY);
 }
 
 
 
 void UART_ReceiveAndConvert(uint8_t RX_BUFFER_SIZE, PduInfoType* PduInfoType_Ptr)
 {
-    uint8_t rxBuffer[RX_BUFFER_SIZE];
-    uint8_t hexValue;
-    uint8_t hexOutput[RX_BUFFER_SIZE / 2];
-    uint16_t length = 0;
+	uint8_t rxBuffer[RX_BUFFER_SIZE];
+	uint8_t hexValue;
+	uint8_t hexOutput[RX_BUFFER_SIZE / 2];
+	uint16_t length = 0;
 
-    // Receive ASCII characters from UART
-    if (HAL_UART_Receive(&huart2, rxBuffer, RX_BUFFER_SIZE, HAL_MAX_DELAY) == HAL_OK) {
-        // Calculate the length of the received string
-        length = RX_BUFFER_SIZE/*strlen((char*)rxBuffer)*/;
+	// Receive ASCII characters from UART
+	if (HAL_UART_Receive(&huart2, rxBuffer, RX_BUFFER_SIZE, HAL_MAX_DELAY) == HAL_OK) {
+		// Calculate the length of the received string
+		length = RX_BUFFER_SIZE/*strlen((char*)rxBuffer)*/;
 
-        // Ensure the length is even (each hex byte is represented by 2 ASCII characters)
-        if (length % 2 != 0) {
-            // Send an error message
-            char errorMsg[] = "Error: Odd number of characters received.\n";
-            HAL_UART_Transmit(&huart2, (uint8_t*)errorMsg, strlen(errorMsg), HAL_MAX_DELAY);
-            return;
-        }
+		// Ensure the length is even (each hex byte is represented by 2 ASCII characters)
+		if (length % 2 != 0) {
+			// Send an error message
+			char errorMsg[] = "Error: Odd number of characters received.\n";
+			HAL_UART_Transmit(&huart2, (uint8_t*)errorMsg, strlen(errorMsg), HAL_MAX_DELAY);
+			return;
+		}
 
-        // Process each pair of ASCII characters
-        for (uint16_t i = 0; i < length; i += 2) {
-            hexValue = (charToHex(rxBuffer[i]) << 4) | charToHex(rxBuffer[i + 1]);
-            //update hexvalue into frame
-            PduInfoType_Ptr->Data[(i / 2)+3] = hexValue;
-            hexOutput[i / 2] = hexValue;
-            // Optionally, send the hexadecimal values back via UART
-            //HAL_UART_Transmit(&huart2, hexOutput, 1/*length / 2*/, HAL_MAX_DELAY);
-        }
-        sendHexArrayAsASCII(hexOutput,  length / 2);
+		// Process each pair of ASCII characters
+		for (uint16_t i = 0; i < length; i += 2) {
+			hexValue = (charToHex(rxBuffer[i]) << 4) | charToHex(rxBuffer[i + 1]);
+			//update hexvalue into frame
+			PduInfoType_Ptr->Data[(i / 2)+3] = hexValue;
+			hexOutput[i / 2] = hexValue;
+			// Optionally, send the hexadecimal values back via UART
+			//HAL_UART_Transmit(&huart2, hexOutput, 1/*length / 2*/, HAL_MAX_DELAY);
+		}
+		sendHexArrayAsASCII(hexOutput,  length / 2);
 
-    }
+	}
 }
 
 uint8_t charToHex(uint8_t ascii)
 {
-    if (ascii >= '0' && ascii <= '9') {
-        return ascii - '0';
-    } else if (ascii >= 'A' && ascii <= 'F') {
-        return ascii - 'A' + 10;
-    } else if (ascii >= 'a' && ascii <= 'f') {
-        return ascii - 'a' + 10;
-    } else {
-        return 0; // Invalid character
-    }
+	if (ascii >= '0' && ascii <= '9') {
+		return ascii - '0';
+	} else if (ascii >= 'A' && ascii <= 'F') {
+		return ascii - 'A' + 10;
+	} else if (ascii >= 'a' && ascii <= 'f') {
+		return ascii - 'a' + 10;
+	} else {
+		return 0; // Invalid character
+	}
 }
 
 void UDS_Write_Data_Server(uint8_t* received_data, uint16_t received_length)
@@ -1003,9 +1002,38 @@ void UDS_MainFunction()
 		if(UDS_Tx_Confirm)
 		{
 			UDS_Tx_Confirm = 0;
-			if ( UDS_Struct ->Data[Neg_Res] == 0x7f)
+			if ( UDS_Struct ->Data[Neg_Res_INDEX] == 0x7f)
 			{
-				HAL_UART_Transmit(&huart2, (uint8_t*) "\r\n Sorry Negative frame .\r\n",strlen("\r\n Sorry Negative frame .\r\n"), HAL_MAX_DELAY);
+				//				HAL_UART_Transmit(&huart2, (uint8_t*) "\r\n Sorry Negative frame .\r\n",strlen("\r\n Sorry Negative frame .\r\n"), HAL_MAX_DELAY);
+				switch(UDS_Struct ->Data[NRC_INDEX])
+				{
+				case NRC_SID :
+					HAL_UART_Transmit(&huart2, (uint8_t*) "\r\nThis Service is not Available.\r\n",strlen("\r\nThis Service is not Available.\r\n"), HAL_MAX_DELAY);
+					break ;
+
+				case NRC_sub_fun :
+					HAL_UART_Transmit(&huart2, (uint8_t*) "\r\nThis Sub Function is not Available.\r\n",strlen("\r\nThis Sub Function is not Available.\r\n"), HAL_MAX_DELAY);
+
+					break ;
+
+				case NRC_WRITE_secuirty :
+					HAL_UART_Transmit(&huart2, (uint8_t*) "\r\nNot Secured, Please Enter a Key.\r\n",strlen("\r\nNot Secured, Please Enter a Key.\r\n"), HAL_MAX_DELAY);
+
+					break ;
+
+				case NRC_WRITE_defualt :
+					HAL_UART_Transmit(&huart2, (uint8_t*) "\r\nWrong Session, Please Enter Extended Session.\r\n",strlen("\r\nWrong Session, Please Enter Extended Session.\r\n"), HAL_MAX_DELAY);
+
+					break ;
+
+				case NRC_sec_key_seed :
+					HAL_UART_Transmit(&huart2, (uint8_t*) "\r\nNot Secured, Please Enter a Key.\r\n",strlen("\r\nNot Secured, Please Enter a Key.\r\n"), HAL_MAX_DELAY);
+
+					break ;
+
+				default:
+					//Nothing
+				}
 			}
 
 			else {
