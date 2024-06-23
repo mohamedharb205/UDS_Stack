@@ -19,21 +19,27 @@
 //extern uint8_t* seed;
 //extern uint8_t* key;
 
+/*******************************************************************/
 
+// select one target for MC
+
+#define Tempreture_Add  	1
+#define Pressure_Add    	2
+#define Functional_Add  	3
+
+#define	Global_Target 		Tempreture_Add
+
+
+// select CAN_MODE for MC :
+//Client
+//Global_Target
+#define Client 				0
+#define CAN_MODE 			Global_Target
 
 //Can Tp Structs & functions
 
 
-typedef enum
-{
-	NRC_WRITE_secuirty = 10,
-	NRC_WRITE_defualt	=15,
-	NRC_SID = 20,
-	NRC_sub_fun = 30,
-	NRC_sec_key_seed = 40
 
-
-}NRC_VAR;
 
 //Std_ReturnType CanTp_Transmit(uint32_t TxPduId, PduInfoType* PduInfoPtr);
 //Std_ReturnType CanTp_RxIndication (uint32_t RxPduId, PduInfoTRx* PduInfoPtr);

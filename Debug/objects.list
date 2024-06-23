@@ -1,5 +1,6 @@
 "./Core/Src/APP_UDS_Diag.o"
 "./Core/Src/CanIf.o"
+"./Core/Src/CanNm.o"
 "./Core/Src/CanTp.o"
 "./Core/Src/can.o"
 "./Core/Src/freertos.o"

@@ -285,7 +285,7 @@ void CanTp_encodeFlowControlFrame(uint32_t TxPduId, PduInfoType* PduInfoPtr){
 	EncodedPduInfo.Data[0] = 0x30;  // Flow Status: Continue to send (CTS)
 	EncodedPduInfo.Data[1] = availableBuffers;  // Block Size: 0 (no blocks)
 	EncodedPduInfo.Data[2] = 0x00;  // Separation Time: 0 ms (no delay)
-
+	numberOfConsecutiveFramesToReceive = availableBuffers;
 	// The remaining bytes can be set to 0
 	for (uint8_t i = 3; i < 8; i++) {
 		EncodedPduInfo.Data[i] = 0x00;
@@ -333,6 +333,7 @@ void CanTp_decodeFirstFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	CanTp_ConnectData(&DecodedPduInfo);
 }
 void CanTp_decodeConsecutiveFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
+	numberOfConsecutiveFramesToReceive--;
 	uint8_t i = 0;
 	DecodedPduInfo.Length = numberOfRemainingBytesToReceive > 7 ? 7 : numberOfRemainingBytesToReceive;
 	if(ConsecSN == (PduInfoPtr->Data[0] & 0x0F)){
@@ -354,6 +355,7 @@ void CanTp_decodeFlowControlFrame(uint32_t RxPduId, PduInfoTRx* PduInfoPtr){
 	//	if (blockSize == 0) {
 	// Continuous sending without waiting for further flow control
 	numberOfConsecutiveFramesToSend = blockSize;
+
 	//	} else {
 	//		numberOfConsecutiveFramesToSend = blockSize;
 	//	}

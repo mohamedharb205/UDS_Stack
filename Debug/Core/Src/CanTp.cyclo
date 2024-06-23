@@ -11,5 +11,5 @@
 ../Core/Src/CanTp.c:301:6:CanTp_decodeSingleFrame	2
 ../Core/Src/CanTp.c:323:6:CanTp_decodeFirstFrame	2
 ../Core/Src/CanTp.c:335:6:CanTp_decodeConsecutiveFrame	5
-../Core/Src/CanTp.c:347:6:CanTp_decodeFlowControlFrame	5
-../Core/Src/CanTp.c:389:6:CanTp_ConnectData	2
+../Core/Src/CanTp.c:348:6:CanTp_decodeFlowControlFrame	5
+../Core/Src/CanTp.c:391:6:CanTp_ConnectData	2
