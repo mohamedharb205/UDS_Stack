@@ -50,13 +50,13 @@ typedef enum {
 void CanNm_Init(void);
 
 // Function for CanNm main function
-Std_ReturnType CanNm_MainFunction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr);
+void CanNm_MainFunction();
 
 // Function for CanNm receive indication
-Std_ReturnType CanNm_RxIndication(uint32_t RxPduId, PduInfoTRx* PduInfoPtr);
+void CanNm_RxIndication();
 
 // Function for CanNm timeout handling
-void CanNm_TimeOut(void);
+void CanNm_TimeOut(uint8_t timerNum);
 
 // Function for CanNm transmit confirmation
 void CanNm_TxConfirmation(void);

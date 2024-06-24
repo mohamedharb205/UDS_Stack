@@ -45,7 +45,8 @@ Core/Src/CanNm.o: ../Core/Src/CanNm.c ../Core/Inc/CanNm.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/semphr.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h
+ ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h \
+ ../Core/Inc/tim.h
 ../Core/Inc/CanNm.h:
 ../Core/Inc/CanIf.h:
 ../Core/Inc/can.h:
@@ -96,3 +97,4 @@ Core/Src/CanNm.o: ../Core/Src/CanNm.c ../Core/Inc/CanNm.h \
 ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h:
+../Core/Inc/tim.h:

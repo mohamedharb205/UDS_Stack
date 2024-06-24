@@ -14,6 +14,8 @@ CAN_RxHeaderTypeDef rxHeader;
 PduInfoTRx CanIfPduInfo;
 volatile int8_t CanIf_Rx;
 Std_ReturnType (*CanTp_Callback)(uint32_t RxPduId, PduInfoTRx* PduInfoPtr) = NULL;
+void (*CanNm_TxCallback)(void) = NULL;
+void (*CanNm_RxCallback)(void) = NULL;
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan1){
 	if (HAL_CAN_GetRxMessage(hcan1, CAN_RX_FIFO0, &rxHeader, CanIfPduInfo.Data) != HAL_OK) {
@@ -35,6 +37,9 @@ void CanIf_Transmit(uint32_t TxPduId, PduInfoTRx* PduInfoPtr){
 	if(TxPduId == 0){
 		txHeader.StdId = 0x100;
 	}
+	else if(TxPduId == 1){
+		txHeader.StdId = 0x200;
+	}
 
 	txHeader.ExtId = 0x00;
 	txHeader.IDE = CAN_ID_STD;
@@ -45,6 +50,9 @@ void CanIf_Transmit(uint32_t TxPduId, PduInfoTRx* PduInfoPtr){
 		// Transmission error
 		Error_Handler();
 
+	}
+	else if(CanNm_TxCallback != NULL && TxPduId == 1){
+		CanNm_TxCallback();
 	}
 //	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
 }
@@ -80,9 +88,12 @@ void CanIf_Receive(){
 			break;
 			}
 
-			if(CanTp_Callback != NULL)
+			if(CanTp_Callback != NULL && PDU_ID == 0)
 			{
 				CanTp_Callback(PDU_ID, &CanIfPduInfo);
+			}
+			else if(CanNm_RxCallback != NULL && PDU_ID == 1){
+				CanNm_RxCallback();
 			}
 		}
 		vTaskDelay(10);
@@ -93,5 +104,17 @@ void CanIf_setCallback(Std_ReturnType (*IF_Callback)(uint32_t RxPduId, PduInfoTR
 	if(IF_Callback != NULL)
 	{
 		CanTp_Callback = IF_Callback ;
+	}
+}
+
+void CanIf_setNmTxCallback(void (*PTF)()){
+	if(PTF!=NULL){
+		CanNm_TxCallback= PTF;
+	}
+}
+
+void CanIf_setNmRxCallback(void (*PTF)()){
+	if(PTF!=NULL){
+		CanNm_RxCallback= PTF;
 	}
 }

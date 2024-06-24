@@ -76,7 +76,7 @@ uint8_t Sec_uint32SecurityAccess (PduInfoType * Ptr);
 void UDS_Read_Data_Server(uint8_t* data);
 void UDS_Control_Session_Server(uint8_t *Received);
 void reset_timer(void);
-void stop_timer(void);
+void stop_timer(TIM_HandleTypeDef* htim);
 void start_timer(void);
 void UDS_Tester_Presenter_Server(void);
 void UDS_MainFunction();

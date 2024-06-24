@@ -928,6 +928,10 @@ void reset_timer(void)
 	//    HAL_TIM_Base_Start_IT(&htim6); // Start Timer6 again
 }
 
+void stop_timer(TIM_HandleTypeDef* htim){
+	HAL_TIM_Base_Stop_IT(htim); // Stop Timer
+}
+
 void start_timer(void)
 {
 	//	HAL_TIM_Base_Start(&htim6);
