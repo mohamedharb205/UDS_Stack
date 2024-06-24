@@ -21,7 +21,7 @@ uint8_t NM_MSG_TranFlag = 0;                               // Flag indicating wh
 uint8_t Rep_MSG_Bit_State = 0;                             // State of the repeat message bit.
 uint8_t Rep_MSG_State_Req = 0;                             // Request state for the repeat message.
 
-
+void (*GlobalTxPTF)() = NULL;
 void CanNm_Init(void)
 {
 	// Initialize the CAN network management to sleep mode and all related variables
@@ -61,28 +61,14 @@ Std_ReturnType CanNm_MainFunction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)
 		switch(CanNm_Mode)
 		{
 		case BUS_SLEEP_MODE:
-			if(WakeUp_Event == PASSIVE_WAKEUP)
+			if(WakeUp_Event != SLEEP)
 			{
 				// 1- Start NM TimeOut Timer
 				NM_Timer = RUNNING;
 				// Start NM Timer here
 
 				// 2- Start REPEAT_MESSAGE Timer
-				Repeat_Message_Timer = RUNNING;
-				// Start REPEAT_MESSAGE Timer here
-
-				// 3- Notify Nm_NetworkMode --> change mode to Networkmode
-				CanNm_Mode = NETWORK_MODE;
-				NetworkModeState = REPEAT_MESSAGE;
-			}
-			else if(WakeUp_Event == ACTIVE_WAKEUP)
-			{
-				// 1- Start NM TimeOut Timer
-				NM_Timer = RUNNING;
-				// Start NM Timer here
-
-				// 2- Start REPEAT_MESSAGE Timer
-				Repeat_Message_Timer = RUNNING;
+				Repeat_Message_Timer = RUNNING; //timeout must be less than NM_Timer
 				// Start REPEAT_MESSAGE Timer here
 
 				// 3- Notify Nm_NetworkMode --> change mode to Networkmode
@@ -104,7 +90,7 @@ Std_ReturnType CanNm_MainFunction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)
 					// Restart NM timer
 				}
 				// Send Repeated Msg to inform nodes that this ECU is awake
-				CanIf_Transmit(RxPduId,PduInfoPtr);
+				//				CanIf_Transmit(RxPduId,PduInfoPtr); // we will not implement this
 				/*
 				 * To Do
 				 * if there is a message corruption
@@ -116,8 +102,10 @@ Std_ReturnType CanNm_MainFunction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)
 				 * 6-Reception and Processing: ECU B receives the retransmitted critical message from ECU A. Now ECU B has the complete and accurate information it needs.
 				 */
 
-				if(Repeat_Message_Timer == TIMEOUT && NM_Timer == RUNNING)
+				if(Repeat_Message_Timer == TIMEOUT /*&& NM_Timer == RUNNING*/)
 				{
+					NM_Timer = RUNNING;
+					//reset NM_Timer
 					if(Network_State == NETWORK_RELEASED)
 					{
 						NetworkModeState = READY_SLEEP;
@@ -135,9 +123,12 @@ Std_ReturnType CanNm_MainFunction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)
 				break;
 
 			case READY_SLEEP:
-				if(NM_MSG_RecFlag == 1 || NM_MSG_TranFlag == 1 )
+				if(NM_MSG_RecFlag == 1)
 				{
 					// Restart NM timer
+					if(Rep_MSG_Bit_State){
+						Rep_MSG_State_Req = 1;
+					}
 				}
 				else
 				{
@@ -153,20 +144,14 @@ Std_ReturnType CanNm_MainFunction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)
 				{
 					// Do nothing
 				}
-				if(Network_State == NETWORK_REQUESTED)
-				{
-					NetworkModeState = NORMAL_OPERATION;
+				if(Rep_MSG_State_Req){
+					NetworkModeState = REPEAT_MESSAGE;
+					Repeat_Message_Timer = RUNNING;
+					//reset rep msg timer
 				}
-				else
-				{
+				else{
 					// Do nothing
 				}
-
-				if(NM_Timer == TIMEOUT || NM_MSG_RecFlag == 1)
-				{
-					// Restart NM timer
-				}
-
 				/*
 				 * To Do
 				 * Add if (Repeat MSG Bit Or Repeat MSG State Requested)
@@ -181,14 +166,27 @@ Std_ReturnType CanNm_MainFunction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)
 				break;
 
 			case NORMAL_OPERATION:
-				if(NM_Timer == TIMEOUT || NM_MSG_RecFlag == 1 || NM_MSG_TranFlag == 1 )
+				if(NM_MSG_RecFlag == 1 || NM_MSG_TranFlag == 1)
 				{
 					// Restart NM timer
+					if(Rep_MSG_Bit_State){
+						Rep_MSG_State_Req = 1;
+					}
 				}
 				if(Network_State == NETWORK_RELEASED)
 				{
 					NetworkModeState = READY_SLEEP;
 				}
+				else if(Rep_MSG_State_Req){
+					NetworkModeState = REPEAT_MESSAGE;
+					Repeat_Message_Timer = RUNNING;
+					NM_Timer = STOPPED;
+					//reset rep msg timer
+				}
+				else if(NM_MSG_TranFlag == 1){
+					//transmit
+				}
+
 				/*
 				 * To Do
 				 * Add if (Repeat MSG Bit Or Repeat MSG State Requested)
@@ -213,8 +211,9 @@ Std_ReturnType CanNm_MainFunction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)
 				if(Bus_Sleep_Timer == TIMEOUT)
 				{
 					CanNm_Mode = BUS_SLEEP_MODE;
+					Bus_Sleep_Timer = STOPPED;
 				}
-				if(Network_State == NETWORK_REQUESTED)
+				if(NM_MSG_RecFlag == 1 || NM_MSG_TranFlag == 1)
 				{
 					CanNm_Mode = NETWORK_MODE;
 					NetworkModeState = REPEAT_MESSAGE;
@@ -231,26 +230,57 @@ Std_ReturnType CanNm_MainFunction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)
 	}
 	return Ret;
 }
-
+//This should be passed to CanIf_setNmRxCallback()
 Std_ReturnType CanNm_RxIndiaction(uint32_t RxPduId, PduInfoTRx* PduInfoPtr)
 {
 	Std_ReturnType Ret = E_OK;
-
+	NM_MSG_RecFlag = 1;
+	if(CanNm_Mode == BUS_SLEEP_MODE){
+		WakeUp_Event = PASSIVE_WAKEUP;
+	}
 	return Ret;
 }
-void CanNm_NetworkRequest(void)
-{
-	Network_State = NETWORK_REQUESTED;
-}
+//void CanNm_NetworkRequest(void)
+//{
+//	Network_State = NETWORK_REQUESTED;
+//}
 void CanNm_NetworkRelease(void)
 {
 	Network_State = NETWORK_RELEASED;
 }
 void CanNm_TimeOut(void)
 {
-
+	if(CanNm_Mode == NETWORK_MODE){
+		if(NetworkModeState == REPEAT_MESSAGE){
+			Repeat_Message_Timer = TIMEOUT;
+		}
+		else{
+			NM_Timer = TIMEOUT;
+		}
+	}
+	else if(CanNm_Mode == PREPARE_BUS_SLEEP_MODE){
+		PREPARE_BUS_SLEEP_MODE = TIMEOUT;
+	}
 }
+//This should be passed to CanIf_setNmTxCallback()
 void CanNm_TxConfirmation(void)
 {
+	//send confirmation
+	if(GlobalTxPTF != NULL){
+		GlobalTxPTF();
+	}
+}
 
+void CanNm_setTxCallback(void (*PTF)()){
+	if(PTF != NULL){
+		GlobalTxPTF = PTF;
+	}
+}
+
+void CanNm_Transmit(){
+	Network_State = NETWORK_REQUESTED;
+	NM_MSG_TranFlag = 1;
+	if(CanNm_Mode == BUS_SLEEP_MODE){
+		WakeUp_Event = ACTIVE_WAKEUP;
+	}
 }

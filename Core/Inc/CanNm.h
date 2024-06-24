@@ -62,7 +62,8 @@ void CanNm_TimeOut(void);
 void CanNm_TxConfirmation(void);
 
 // Function for CanNm Network Request
-void CanNm_NetworkRequest(void);
+//void CanNm_NetworkRequest(void);
+void CanNm_Transmit();
 
 // Function for CanNm Network Release
 void CanNm_NetworkRelease(void);
