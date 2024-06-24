@@ -1248,7 +1248,7 @@ void server_call_back(uint32_t TxPduId, PduInfoType* ptr)
 			}
 
 
-			else if (ptr->Data[SID] == Write_Service /*&& global_sec_flag ==1 && global_session == ExtendedSession */ )
+			else if (ptr->Data[SID] == Write_Service && global_sec_flag ==1 && global_session == ExtendedSession)
 			{
 				//printf("u are in Write_Service\n");
 				//			HAL_UART_Transmit(&huart2, (const uint8_t*)" u are in Write_Service \r\n", 50, 100 );
