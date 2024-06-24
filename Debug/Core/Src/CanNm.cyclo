@@ -1,7 +1,8 @@
 ../Core/Src/CanNm.c:25:6:CanNm_Init	1
-../Core/Src/CanNm.c:55:16:CanNm_MainFunction	24
-../Core/Src/CanNm.c:235:16:CanNm_RxIndiaction	1
-../Core/Src/CanNm.c:241:6:CanNm_NetworkRequest	1
-../Core/Src/CanNm.c:245:6:CanNm_NetworkRelease	1
-../Core/Src/CanNm.c:249:6:CanNm_TimeOut	1
-../Core/Src/CanNm.c:253:6:CanNm_TxConfirmation	1
+../Core/Src/CanNm.c:55:16:CanNm_MainFunction	28
+../Core/Src/CanNm.c:234:16:CanNm_RxIndiaction	2
+../Core/Src/CanNm.c:247:6:CanNm_NetworkRelease	1
+../Core/Src/CanNm.c:251:6:CanNm_TimeOut	4
+../Core/Src/CanNm.c:266:6:CanNm_TxConfirmation	2
+../Core/Src/CanNm.c:274:6:CanNm_setTxCallback	2
+../Core/Src/CanNm.c:280:6:CanNm_Transmit	2

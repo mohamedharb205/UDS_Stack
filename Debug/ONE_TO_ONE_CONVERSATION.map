@@ -447,26 +447,30 @@ Discarded input sections
                 0x0000000000000000        0x1 ./Core/Src/CanNm.o
  .bss.Rep_MSG_State_Req
                 0x0000000000000000        0x1 ./Core/Src/CanNm.o
+ .bss.GlobalTxPTF
+                0x0000000000000000        0x4 ./Core/Src/CanNm.o
  .text.CanNm_Init
                 0x0000000000000000       0x7c ./Core/Src/CanNm.o
  .text.CanNm_MainFunction
-                0x0000000000000000      0x198 ./Core/Src/CanNm.o
+                0x0000000000000000      0x1cc ./Core/Src/CanNm.o
  .text.CanNm_RxIndiaction
-                0x0000000000000000       0x1c ./Core/Src/CanNm.o
- .text.CanNm_NetworkRequest
-                0x0000000000000000       0x18 ./Core/Src/CanNm.o
+                0x0000000000000000       0x3c ./Core/Src/CanNm.o
  .text.CanNm_NetworkRelease
                 0x0000000000000000       0x18 ./Core/Src/CanNm.o
  .text.CanNm_TimeOut
-                0x0000000000000000        0xe ./Core/Src/CanNm.o
- .text.CanNm_TxConfirmation
-                0x0000000000000000        0xe ./Core/Src/CanNm.o
- .debug_info    0x0000000000000000      0x399 ./Core/Src/CanNm.o
- .debug_abbrev  0x0000000000000000      0x13f ./Core/Src/CanNm.o
- .debug_aranges
                 0x0000000000000000       0x50 ./Core/Src/CanNm.o
- .debug_rnglists
+ .text.CanNm_TxConfirmation
+                0x0000000000000000       0x1c ./Core/Src/CanNm.o
+ .text.CanNm_setTxCallback
+                0x0000000000000000       0x24 ./Core/Src/CanNm.o
+ .text.CanNm_Transmit
                 0x0000000000000000       0x38 ./Core/Src/CanNm.o
+ .debug_info    0x0000000000000000      0x3c8 ./Core/Src/CanNm.o
+ .debug_abbrev  0x0000000000000000      0x171 ./Core/Src/CanNm.o
+ .debug_aranges
+                0x0000000000000000       0x58 ./Core/Src/CanNm.o
+ .debug_rnglists
+                0x0000000000000000       0x3e ./Core/Src/CanNm.o
  .debug_macro   0x0000000000000000      0x355 ./Core/Src/CanNm.o
  .debug_macro   0x0000000000000000      0xaa8 ./Core/Src/CanNm.o
  .debug_macro   0x0000000000000000       0x22 ./Core/Src/CanNm.o
@@ -536,10 +540,10 @@ Discarded input sections
  .debug_macro   0x0000000000000000       0x7e ./Core/Src/CanNm.o
  .debug_macro   0x0000000000000000       0x19 ./Core/Src/CanNm.o
  .debug_macro   0x0000000000000000       0xf2 ./Core/Src/CanNm.o
- .debug_line    0x0000000000000000      0xbdd ./Core/Src/CanNm.o
- .debug_str     0x0000000000000000    0xd3039 ./Core/Src/CanNm.o
+ .debug_line    0x0000000000000000      0xc4f ./Core/Src/CanNm.o
+ .debug_str     0x0000000000000000    0xd3044 ./Core/Src/CanNm.o
  .comment       0x0000000000000000       0x44 ./Core/Src/CanNm.o
- .debug_frame   0x0000000000000000       0xfc ./Core/Src/CanNm.o
+ .debug_frame   0x0000000000000000      0x124 ./Core/Src/CanNm.o
  .ARM.attributes
                 0x0000000000000000       0x34 ./Core/Src/CanNm.o
  .group         0x0000000000000000        0xc ./Core/Src/CanTp.o

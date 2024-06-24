@@ -259,7 +259,7 @@ void CanNm_TimeOut(void)
 		}
 	}
 	else if(CanNm_Mode == PREPARE_BUS_SLEEP_MODE){
-		PREPARE_BUS_SLEEP_MODE = TIMEOUT;
+		Bus_Sleep_Timer = TIMEOUT;
 	}
 }
 //This should be passed to CanIf_setNmTxCallback()
