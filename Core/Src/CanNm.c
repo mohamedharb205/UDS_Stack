@@ -7,6 +7,8 @@
 #include "CanNm.h"
 #include "cmsis_os.h"
 #include "tim.h"
+#include "usart.h"
+#include "string.h"
 
 CanNm_Mode_t CanNm_Mode = BUS_SLEEP_MODE;                  // Represents the current mode of the CAN network management.
 CanNm_WakeUpEvent_State_t WakeUp_Event = SLEEP;            // Indicates the current state of the wake-up event for the CAN network.
@@ -19,19 +21,17 @@ CanNm_Timer_State_t Send_MSG_Timer = STOPPED;             // Message Periodicity
 
 CanNm_Network_State_t Network_State = NETWORK_RELEASED;    // Current state of the CAN network.
 PduInfoTRx GlobalNmPdu = {.Length = 1};
-uint8_t NM_MSG_RecFlag = 0;                                // Flag indicating whether a network management message has been received.
-uint8_t NM_MSG_TranFlag = 0;                               // Flag indicating whether a network management message has been transmitted.
-uint8_t Rep_MSG_Bit_State = 0;                             // State of the repeat message bit.
-uint8_t Rep_MSG_State_Req = 0;                             // Request state for the repeat message.
+volatile uint8_t NM_MSG_RecFlag = 0;                                // Flag indicating whether a network management message has been received.
+volatile uint8_t NM_MSG_TranFlag = 0;                               // Flag indicating whether a network management message has been transmitted.
+volatile uint8_t Rep_MSG_Bit_State = 0;                             // State of the repeat message bit.
+volatile uint8_t Rep_MSG_State_Req = 0;                             // Request state for the repeat message.
+volatile uint8_t SEND_REPEAT_MESSAGE = 0;
 
 void (*GlobalTxPTF)() = NULL;
-extern
 
-void CanNm_Init(void)
+
+void CanNm_Sleep(void)
 {
-	// Initialize the CAN network management to sleep mode and all related variables
-	CanIf_setNmTxCallback(CanNm_TxConfirmation);
-	CanIf_setNmRxCallback(CanNm_RxIndication);
 	// Set CAN network mode to bus sleep mode
 	CanNm_Mode = BUS_SLEEP_MODE;
 
@@ -45,23 +45,21 @@ void CanNm_Init(void)
 	NM_Timer = STOPPED;
 	Repeat_Message_Timer = STOPPED;
 	Bus_Sleep_Timer = STOPPED;
+	Send_MSG_Timer = STOPPED;
 	//reset all timers
 	//reset Nm timer
+
 	HAL_TIM_Base_Stop_IT(&htim7); // Stop Timer7
 	TIM7->CNT = 0; // Reset Timer7 counter to 0
-	HAL_TIM_Base_Start_IT(&htim7); // Start Timer7 again
 	//reset rep msg timer
 	HAL_TIM_Base_Stop_IT(&htim4); // Stop Timer4
 	TIM4->CNT = 0; // Reset Timer4 counter to 0
-	HAL_TIM_Base_Start_IT(&htim4); // Start Timer4 again
 	//reset prepare bus sleep timer
 	HAL_TIM_Base_Stop_IT(&htim3); // Stop Timer3
 	TIM3->CNT = 0; // Reset Timer3 counter to 0
-	HAL_TIM_Base_Start_IT(&htim3); // Start Timer3 again
 	//reset send msg timer
-	HAL_TIM_Base_Stop_IT(&htim12); // Stop Timer12
-	TIM12->CNT = 0; // Reset Timer12 counter to 0
-	HAL_TIM_Base_Start_IT(&htim12); // Start Timer12 again
+	HAL_TIM_Base_Stop_IT(&htim2); // Stop Timer12
+	TIM2->CNT = 0; // Reset Timer12 counter to 0
 
 	// Set network state to network released
 	Network_State = NETWORK_RELEASED;
@@ -73,8 +71,28 @@ void CanNm_Init(void)
 	Rep_MSG_State_Req = 0;
 
 	// Enter Sleep Mode
-	HAL_SuspendTick();
-	HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+	//	HAL_SuspendTick();
+	//	HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+}
+void CanNm_Init(void)
+{
+	// Initialize the CAN network management to sleep mode and all related variables
+	CanIf_setNmTxCallback(CanNm_TxConfirmation);
+	CanIf_setNmRxCallback(CanNm_RxIndication);
+
+	CanNm_Sleep();
+	HAL_TIM_Base_Start_IT(&htim7); // Start Timer7 again
+
+	HAL_TIM_Base_Start_IT(&htim4); // Start Timer4 again
+
+	HAL_TIM_Base_Start_IT(&htim3); // Start Timer3 again
+
+	HAL_TIM_Base_Start_IT(&htim2); // Start Timer12 again
+
+
+	// Enter Sleep Mode
+	//	HAL_SuspendTick();
+	//	HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
 }
 
 void CanNm_MainFunction()
@@ -83,6 +101,8 @@ void CanNm_MainFunction()
 		switch(CanNm_Mode)
 		{
 		case BUS_SLEEP_MODE:
+			HAL_UART_Transmit(&huart2,(uint8_t*) "\r\nBUS_SLEEP_MODE\r\n", strlen("\r\nBUS_SLEEP_MODE\r\n"), HAL_MAX_DELAY);
+
 			if(WakeUp_Event != SLEEP)
 			{
 				// 1- Start NM TimeOut Timer
@@ -97,6 +117,7 @@ void CanNm_MainFunction()
 				// 3- Notify Nm_NetworkMode --> change mode to Networkmode
 				CanNm_Mode = NETWORK_MODE;
 				NetworkModeState = REPEAT_MESSAGE;
+				SEND_REPEAT_MESSAGE = 1;
 			}
 			else
 			{
@@ -108,13 +129,23 @@ void CanNm_MainFunction()
 			switch(NetworkModeState)
 			{
 			case REPEAT_MESSAGE:
+				HAL_UART_Transmit(&huart2,(uint8_t*) "\r\nREPEAT_MESSAGE\r\n", strlen("\r\nREPEAT_MESSAGE\r\n"), HAL_MAX_DELAY);
+				if(SEND_REPEAT_MESSAGE)
+				{
+					SEND_REPEAT_MESSAGE =0;
+					//transmit
+					GlobalNmPdu.Data[0] = 1;
+//					CanIf_Transmit(1, &GlobalNmPdu);
+				}
 				if(NM_Timer == TIMEOUT || NM_MSG_RecFlag == 1 || NM_MSG_TranFlag == 1 )
 				{
+
 					// Restart NM timer
 					HAL_TIM_Base_Stop_IT(&htim7); // Stop Timer7
 					TIM7->CNT = 0; // Reset Timer7 counter to 0
 					HAL_TIM_Base_Start_IT(&htim7); // Start Timer7 again
 					NM_MSG_RecFlag = 0;
+					//NM_MSG_TranFlag = 0;
 				}
 				// Send Repeated Msg to inform nodes that this ECU is awake
 				//				CanIf_Transmit(RxPduId,PduInfoPtr); // we will not implement this
@@ -142,7 +173,8 @@ void CanNm_MainFunction()
 					}
 					else if(Network_State == NETWORK_REQUESTED)
 					{
-						HAL_TIM_Base_Start_IT(&htim12);
+
+						HAL_TIM_Base_Start_IT(&htim2);
 						NetworkModeState = NORMAL_OPERATION;
 					}
 					else
@@ -153,6 +185,8 @@ void CanNm_MainFunction()
 				break;
 
 			case READY_SLEEP:
+				HAL_UART_Transmit(&huart2,(uint8_t*) "\r\nREADY_SLEEP\r\n", strlen("\r\nREADY_SLEEP\r\n"), HAL_MAX_DELAY);
+
 				if(NM_MSG_RecFlag == 1)
 				{
 					NM_MSG_RecFlag = 0;
@@ -194,6 +228,7 @@ void CanNm_MainFunction()
 				if(Rep_MSG_State_Req){
 					Rep_MSG_State_Req = 0;
 					NetworkModeState = REPEAT_MESSAGE;
+					SEND_REPEAT_MESSAGE = 1;
 					Repeat_Message_Timer = RUNNING;
 					//reset rep msg timer
 					HAL_TIM_Base_Stop_IT(&htim4); // Stop Timer4
@@ -212,11 +247,15 @@ void CanNm_MainFunction()
 				 *	2- Notify Nm_NetworkMode --> change mode to Networkmode
 				 *	CanNm_Mode = NETWORK_MODE;
 				 *	NetworkModeState = REPEAT_MESSAGE;
+				 *						SEND_REPEAT_MESSAGE = 1;
+				 *
 				 * }
 				 */
 				break;
 
 			case NORMAL_OPERATION:
+				HAL_UART_Transmit(&huart2,(uint8_t*) "\r\nNORMAL_OPERATION\r\n", strlen("\r\nNORMAL_OPERATION\r\n"), HAL_MAX_DELAY);
+
 				if(NM_MSG_RecFlag == 1 || NM_MSG_TranFlag == 1)
 				{
 					// Restart NM timer
@@ -232,6 +271,8 @@ void CanNm_MainFunction()
 				if(Rep_MSG_State_Req){
 					Rep_MSG_State_Req = 0;
 					NetworkModeState = REPEAT_MESSAGE;
+					SEND_REPEAT_MESSAGE = 1;
+
 					Repeat_Message_Timer = RUNNING;
 					//reset rep msg timer
 					HAL_TIM_Base_Stop_IT(&htim4); // Stop Timer4
@@ -246,7 +287,7 @@ void CanNm_MainFunction()
 					NM_MSG_TranFlag = 0;
 					//transmit
 					GlobalNmPdu.Data[0] = 1;
-					CanIf_Transmit(1, &GlobalNmPdu);
+//					CanIf_Transmit(1, &GlobalNmPdu);
 				}
 
 				/*
@@ -258,6 +299,8 @@ void CanNm_MainFunction()
 				 *	2- Notify Nm_NetworkMode --> change mode to Networkmode
 				 *	CanNm_Mode = NETWORK_MODE;
 				 *	NetworkModeState = REPEAT_MESSAGE;
+				 *						SEND_REPEAT_MESSAGE = 1;
+				 *
 				 * }
 				 */
 
@@ -270,16 +313,26 @@ void CanNm_MainFunction()
 			break;
 
 			case PREPARE_BUS_SLEEP_MODE:
+				HAL_UART_Transmit(&huart2,(uint8_t*) "\r\nPREPARE_BUS_SLEEP_MODE\r\n", strlen("\r\nPREPARE_BUS_SLEEP_MODE\r\n"), HAL_MAX_DELAY);
+
 				if(Bus_Sleep_Timer == TIMEOUT)
 				{
 					CanNm_Mode = BUS_SLEEP_MODE;
 					Bus_Sleep_Timer = STOPPED;
-					CanNm_Init(); //Enter sleep mode
+					CanNm_Sleep(); //Enter sleep mode
 				}
 				if(NM_MSG_RecFlag == 1 || NM_MSG_TranFlag == 1)
 				{
 					CanNm_Mode = NETWORK_MODE;
+					NM_Timer = RUNNING;
+					Repeat_Message_Timer = RUNNING;
 					NetworkModeState = REPEAT_MESSAGE;
+					SEND_REPEAT_MESSAGE = 1;
+					// 1- Start NM TimeOut Timer
+//					count4 = 0;
+					HAL_TIM_Base_Start_IT(&htim4); // Start Timer4 again
+
+
 				}
 				break;
 			default:
@@ -302,10 +355,11 @@ void CanNm_NetworkRelease(void)
 {
 	Network_State = NETWORK_RELEASED;
 	Send_MSG_Timer = STOPPED;
+	NM_MSG_TranFlag = 0;
 	//reset send msg timer
-	HAL_TIM_Base_Stop_IT(&htim12); // Stop Timer12
-	TIM12->CNT = 0; // Reset Timer12 counter to 0
-//	HAL_TIM_Base_Start_IT(&htim12); // Start Timer12 again
+	HAL_TIM_Base_Stop_IT(&htim2); // Stop Timer2
+	TIM2->CNT = 0; // Reset Timer12 counter to 0
+	//	HAL_TIM_Base_Start_IT(&htim2); // Start Timer12 again
 }
 
 void CanNm_TimeOut(uint8_t timerNum)
@@ -319,7 +373,7 @@ void CanNm_TimeOut(uint8_t timerNum)
 	else if(timerNum == 3){
 		Bus_Sleep_Timer = TIMEOUT;
 	}
-	else if(timerNum == 12){
+	else if(timerNum == 2){
 		Send_MSG_Timer = TIMEOUT;
 	}
 }

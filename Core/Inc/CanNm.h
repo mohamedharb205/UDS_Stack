@@ -68,4 +68,7 @@ void CanNm_Transmit();
 // Function for CanNm Network Release
 void CanNm_NetworkRelease(void);
 
+
+void CanNm_Sleep(void);
+
 #endif /* INC_CANNM_H_ */
